@@ -70,4 +70,10 @@
   [self.delegate bottomSheetView:self didChangePosition:position];
 }
 
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event
+{
+  CGPoint implPoint = [self convertPoint:point toView:_impl];
+  return [_impl hitTest:implPoint withEvent:event];
+}
+
 @end

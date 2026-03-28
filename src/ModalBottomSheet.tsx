@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import type { SharedValue } from 'react-native-reanimated';
 
-import type { BottomSheetCommonProps } from './BottomSheetBase';
-import { BottomSheetBase } from './BottomSheetBase';
+import { BottomSheet, type BottomSheetProps } from './BottomSheet';
 
-export interface ModalBottomSheetProps extends BottomSheetCommonProps {
+export interface ModalBottomSheetProps
+  extends Omit<BottomSheetProps, 'modal' | 'renderScrim'> {
   scrim?: (progress: SharedValue<number>) => ReactNode;
 }
 
@@ -12,5 +12,5 @@ export const ModalBottomSheet = ({
   scrim,
   ...props
 }: ModalBottomSheetProps) => (
-  <BottomSheetBase {...props} modal renderScrim={scrim} />
+  <BottomSheet {...props} modal renderScrim={scrim} />
 );

@@ -78,7 +78,20 @@ public final class RNSBottomSheetHostingView: UIView {
     sheetContainer.transform = CGAffineTransform(translationX: 0, y: translationY(for: targetIndex))
   }
 
+  private var presentedSheetFrame: CGRect {
+    if let presentation = sheetContainer.layer.presentation() {
+      return presentation.frame
+    }
+    return sheetContainer.frame
+  }
+
+  public override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+    presentedSheetFrame.contains(point)
+  }
+
   public override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    guard self.point(inside: point, with: event) else { return nil }
+
     let containerPoint = convert(point, to: sheetContainer)
     guard sheetContainer.bounds.contains(containerPoint) else { return nil }
     return sheetContainer.hitTest(containerPoint, with: event)

@@ -1,15 +1,19 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ViewStyle } from 'react-native';
-import { Button, FlatList, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Button,
+  FlatList,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   BottomSheet,
-  BottomSheetFlatList,
   BottomSheetProvider,
-  BottomSheetScrollView,
   ModalBottomSheet,
 } from '@swmansion/react-native-bottom-sheet';
 
@@ -154,7 +158,7 @@ const AppContent = () => {
             title="Modal with ScrollView"
             onClose={() => setScrollViewIndex(0)}
           />
-          <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+          <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
             {DATA.map((item, index) => (
               <View
                 key={item.id}
@@ -169,7 +173,7 @@ const AppContent = () => {
                 <Text>{item.title}</Text>
               </View>
             ))}
-          </BottomSheetScrollView>
+          </ScrollView>
         </SheetBackground>
       </ModalBottomSheet>
       <ModalBottomSheet index={flatListIndex} onIndexChange={setFlatListIndex}>
@@ -178,7 +182,7 @@ const AppContent = () => {
             title="Modal with FlatList"
             onClose={() => setFlatListIndex(0)}
           />
-          <BottomSheetFlatList
+          <FlatList
             data={DATA}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ paddingBottom: 24 }}
@@ -271,9 +275,9 @@ const AppContent = () => {
 
 const App = () => (
   <SafeAreaProvider>
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <View style={{ flex: 1 }}>
       <AppContent />
-    </GestureHandlerRootView>
+    </View>
   </SafeAreaProvider>
 );
 
