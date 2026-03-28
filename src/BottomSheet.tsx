@@ -152,15 +152,6 @@ export const BottomSheet = ({
     <DefaultScrim progress={scrimProgress} color={scrimColor} />
   ) : null;
 
-  // On Android Fabric, getBoundingClientRect() is computed from the Yoga
-  // shadow tree, which doesn't know about the native sheetContainer's layout
-  // offset and translationY. This causes Pressability's bounds check to fail
-  // (instant pressOut). Setting `top` on the wrapper updates the shadow tree
-  // to match the actual visual position without affecting native layout
-  // (needsCustomLayoutForChildren is true on the native side).
-  const contentOffsetY =
-    maxHeight - (resolvedDetents[clampedIndex]?.height ?? maxHeight);
-
   const sheet = (
     <Animated.View
       style={StyleSheet.absoluteFill}
@@ -192,7 +183,7 @@ export const BottomSheet = ({
         >
           <View
             collapsable={false}
-            style={{ flex: 1, top: contentOffsetY }}
+            style={{ flex: 1 }}
             pointerEvents="box-none"
           >
             {children}

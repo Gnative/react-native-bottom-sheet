@@ -11,7 +11,9 @@ import android.widget.FrameLayout
 import androidx.dynamicanimation.animation.DynamicAnimation
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.uimanager.PointerEvents
+import com.facebook.react.uimanager.StateWrapper
 import com.facebook.react.views.view.ReactViewGroup
 import kotlin.math.abs
 
@@ -27,6 +29,7 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
   // MARK: - Listener
 
   var listener: BottomSheetViewListener? = null
+  var stateWrapper: StateWrapper? = null
 
   // MARK: - State
 
@@ -130,6 +133,7 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
 
     if (activeAnimation != null || isPanning) return
     sheetContainer.translationY = translationY(targetIndex)
+    updateShadowState(sheetContainer.translationY)
   }
 
   private fun layoutSheetChildren() {
@@ -208,6 +212,19 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
     val maxHeight = detentSpecs.lastOrNull()?.height ?: height.toFloat()
     val ty = sheetContainer.translationY
     listener?.onPositionChange(((maxHeight - ty) / density).toDouble())
+    updateShadowState(ty)
+  }
+
+  private var lastShadowOffsetY = Float.NaN
+
+  private fun updateShadowState(translationY: Float) {
+    val offsetY = (translationY / density).toDouble()
+    if (offsetY.toFloat() == lastShadowOffsetY) return
+    lastShadowOffsetY = offsetY.toFloat()
+    val sw = stateWrapper ?: return
+    val map = Arguments.createMap()
+    map.putDouble("contentOffsetY", offsetY)
+    sw.updateState(map)
   }
 
   // MARK: - Choreographer (position tracking during animation)
@@ -428,5 +445,7 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
     activePointerId = MotionEvent.INVALID_POINTER_ID
     sheetContainer.translationY = 0f
     sheetContainer.removeAllViews()
+    stateWrapper = null
+    lastShadowOffsetY = Float.NaN
   }
 }

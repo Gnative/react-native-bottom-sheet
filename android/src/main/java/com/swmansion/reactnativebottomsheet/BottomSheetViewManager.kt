@@ -3,6 +3,8 @@ package com.swmansion.reactnativebottomsheet
 import android.view.View
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.module.annotations.ReactModule
+import com.facebook.react.uimanager.ReactStylesDiffMap
+import com.facebook.react.uimanager.StateWrapper
 import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.ViewGroupManager
 import com.facebook.react.uimanager.ViewManagerDelegate
@@ -61,6 +63,15 @@ class BottomSheetViewManager :
 
   override fun removeViewAt(parent: BottomSheetView, index: Int) {
     parent.removeSheetChildAt(index)
+  }
+
+  override fun updateState(
+    view: BottomSheetView,
+    props: ReactStylesDiffMap,
+    stateWrapper: StateWrapper?,
+  ): Any? {
+    view.stateWrapper = stateWrapper
+    return null
   }
 
   override fun needsCustomLayoutForChildren(): Boolean = true
