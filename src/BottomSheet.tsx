@@ -1,13 +1,12 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from 'react-native';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, {
-  runOnUI,
-  useAnimatedStyle,
-  useDerivedValue,
-  useSharedValue,
-  type SharedValue,
-} from 'react-native-reanimated';
+import {
+  Animated,
+  Pressable,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import BottomSheetNativeComponent from './BottomSheetNativeComponent';
@@ -16,15 +15,18 @@ import { type Detent, resolveDetent } from './bottomSheetUtils';
 export type { Detent, DetentValue } from './bottomSheetUtils';
 export { programmatic } from './bottomSheetUtils';
 
-const DefaultScrim = ({ progress }: { progress: SharedValue<number> }) => {
-  const style = useAnimatedStyle(() => ({ opacity: progress.value }));
-
+const DefaultScrim = ({
+  progress,
+  color,
+}: {
+  progress: Animated.Value;
+  color: string;
+}) => {
   return (
     <Animated.View
       style={[
         StyleSheet.absoluteFill,
-        { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)' },
-        style,
+        { flex: 1, backgroundColor: color, opacity: progress },
       ]}
     />
   );
@@ -37,9 +39,9 @@ export interface BottomSheetProps {
   index: number;
   animateIn?: boolean;
   onIndexChange?: (index: number) => void;
-  position?: SharedValue<number>;
+  onPositionChange?: (position: number) => void;
   modal?: boolean;
-  renderScrim?: (progress: SharedValue<number>) => ReactNode;
+  scrimColor?: string;
 }
 
 export const BottomSheet = ({
@@ -49,15 +51,16 @@ export const BottomSheet = ({
   index,
   animateIn = true,
   onIndexChange,
-  position,
+  onPositionChange,
   modal = false,
-  renderScrim,
+  scrimColor = 'rgba(0, 0, 0, 0.5)',
 }: BottomSheetProps) => {
   const { height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const maxHeight = screenHeight - insets.top;
   const [contentHeight, setContentHeight] = useState(0);
-  const internalPosition = useSharedValue(0);
+  const currentPositionRef = useRef(0);
+  const scrimProgress = useRef(new Animated.Value(0)).current;
 
   const resolvedDetents = detents.map((detent) => {
     const value = resolveDetent(detent, contentHeight, maxHeight);
@@ -74,17 +77,44 @@ export const BottomSheet = ({
   const clampedIndex = Math.max(0, Math.min(index, resolvedDetents.length - 1));
   const isCollapsed = (resolvedDetents[clampedIndex]?.height ?? 0) === 0;
   const sheetPointerEvents = isCollapsed ? 'none' : 'box-none';
-  const scrimPosition = position ?? internalPosition;
+  const scrimPressEnabledRef = useRef(!modal || isCollapsed);
+  const previousIsCollapsedRef = useRef(isCollapsed);
   const firstNonzeroDetent =
     resolvedDetents.find((detent) => detent.height > 0)?.height ?? 0;
-  const scrimProgress = useDerivedValue(() => {
-    if (firstNonzeroDetent <= 0) {
-      return 0;
+
+  useEffect(() => {
+    const progress =
+      firstNonzeroDetent <= 0
+        ? 0
+        : Math.min(
+            1,
+            Math.max(0, currentPositionRef.current / firstNonzeroDetent)
+          );
+    scrimProgress.setValue(progress);
+  }, [firstNonzeroDetent, scrimProgress]);
+
+  useEffect(() => {
+    if (!modal) {
+      scrimPressEnabledRef.current = true;
+      previousIsCollapsedRef.current = isCollapsed;
+      return undefined;
     }
 
-    const progress = scrimPosition.value / firstNonzeroDetent;
-    return Math.min(1, Math.max(0, progress));
-  });
+    if (previousIsCollapsedRef.current && !isCollapsed) {
+      scrimPressEnabledRef.current = false;
+      previousIsCollapsedRef.current = isCollapsed;
+
+      const frame = requestAnimationFrame(() => {
+        scrimPressEnabledRef.current = true;
+      });
+
+      return () => cancelAnimationFrame(frame);
+    }
+
+    scrimPressEnabledRef.current = !isCollapsed;
+    previousIsCollapsedRef.current = isCollapsed;
+    return undefined;
+  }, [isCollapsed, modal]);
 
   const handleIndexChange = (event: { nativeEvent: { index: number } }) => {
     onIndexChange?.(event.nativeEvent.index);
@@ -93,39 +123,34 @@ export const BottomSheet = ({
   const handlePositionChange = (event: {
     nativeEvent: { position: number };
   }) => {
-    if (position !== undefined) {
-      const height = event.nativeEvent.position;
-      runOnUI(() => {
-        'worklet';
-        position.set(height);
-      })();
-      return;
-    }
-
     const height = event.nativeEvent.position;
-    runOnUI(() => {
-      'worklet';
-      internalPosition.set(height);
-    })();
+    currentPositionRef.current = height;
+    const progress =
+      firstNonzeroDetent <= 0
+        ? 0
+        : Math.min(1, Math.max(0, height / firstNonzeroDetent));
+    scrimProgress.setValue(progress);
+    onPositionChange?.(height);
   };
 
   const closedIndex = resolvedDetents.findIndex(
     (detent) => detent.height === 0
   );
   const handleScrimPress = () => {
-    if (closedIndex === -1 || clampedIndex === closedIndex) {
+    if (
+      closedIndex === -1 ||
+      clampedIndex === closedIndex ||
+      !scrimPressEnabledRef.current
+    ) {
       return;
     }
 
     onIndexChange?.(closedIndex);
   };
 
-  const scrimElement =
-    renderScrim !== undefined ? (
-      renderScrim(scrimProgress)
-    ) : modal ? (
-      <DefaultScrim progress={scrimProgress} />
-    ) : null;
+  const scrimElement = modal ? (
+    <DefaultScrim progress={scrimProgress} color={scrimColor} />
+  ) : null;
 
   const sheet = (
     <Animated.View

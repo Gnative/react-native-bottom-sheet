@@ -244,7 +244,10 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
         stiffness = SpringForce.STIFFNESS_MEDIUM
       }
       setStartVelocity(velocity)
-      addEndListener { _, _, _, _ ->
+      addEndListener { _, canceled, _, _ ->
+        if (canceled) {
+          return@addEndListener
+        }
         stopChoreographer()
         emitPosition()
         activeAnimation = null

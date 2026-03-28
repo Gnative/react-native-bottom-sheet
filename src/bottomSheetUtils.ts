@@ -29,7 +29,6 @@ export const findSnapTarget = (
   currentIndex: number,
   allPositions: { index: number; translateY: number; isDraggable: boolean }[]
 ) => {
-  'worklet';
   const draggablePositions = allPositions.filter(
     (position) => position.isDraggable
   );

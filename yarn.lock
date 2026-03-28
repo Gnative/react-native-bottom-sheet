@@ -680,7 +680,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/plugin-transform-arrow-functions@npm:^7.0.0-0, @babel/plugin-transform-arrow-functions@npm:^7.24.7, @babel/plugin-transform-arrow-functions@npm:^7.27.1":
+"@babel/plugin-transform-arrow-functions@npm:^7.24.7, @babel/plugin-transform-arrow-functions@npm:^7.27.1":
   version: 7.27.1
   resolution: "@babel/plugin-transform-arrow-functions@npm:7.27.1"
   dependencies:
@@ -739,7 +739,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/plugin-transform-class-properties@npm:^7.0.0-0, @babel/plugin-transform-class-properties@npm:^7.25.4, @babel/plugin-transform-class-properties@npm:^7.28.6":
+"@babel/plugin-transform-class-properties@npm:^7.25.4, @babel/plugin-transform-class-properties@npm:^7.28.6":
   version: 7.28.6
   resolution: "@babel/plugin-transform-class-properties@npm:7.28.6"
   dependencies:
@@ -763,7 +763,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/plugin-transform-classes@npm:^7.0.0-0, @babel/plugin-transform-classes@npm:^7.25.4, @babel/plugin-transform-classes@npm:^7.28.6":
+"@babel/plugin-transform-classes@npm:^7.25.4, @babel/plugin-transform-classes@npm:^7.28.6":
   version: 7.28.6
   resolution: "@babel/plugin-transform-classes@npm:7.28.6"
   dependencies:
@@ -1037,7 +1037,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/plugin-transform-nullish-coalescing-operator@npm:^7.0.0-0, @babel/plugin-transform-nullish-coalescing-operator@npm:^7.24.7, @babel/plugin-transform-nullish-coalescing-operator@npm:^7.28.6":
+"@babel/plugin-transform-nullish-coalescing-operator@npm:^7.24.7, @babel/plugin-transform-nullish-coalescing-operator@npm:^7.28.6":
   version: 7.28.6
   resolution: "@babel/plugin-transform-nullish-coalescing-operator@npm:7.28.6"
   dependencies:
@@ -1097,7 +1097,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/plugin-transform-optional-chaining@npm:^7.0.0-0, @babel/plugin-transform-optional-chaining@npm:^7.24.8, @babel/plugin-transform-optional-chaining@npm:^7.27.1, @babel/plugin-transform-optional-chaining@npm:^7.28.6":
+"@babel/plugin-transform-optional-chaining@npm:^7.24.8, @babel/plugin-transform-optional-chaining@npm:^7.27.1, @babel/plugin-transform-optional-chaining@npm:^7.28.6":
   version: 7.28.6
   resolution: "@babel/plugin-transform-optional-chaining@npm:7.28.6"
   dependencies:
@@ -1277,7 +1277,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/plugin-transform-shorthand-properties@npm:^7.0.0-0, @babel/plugin-transform-shorthand-properties@npm:^7.24.7, @babel/plugin-transform-shorthand-properties@npm:^7.27.1":
+"@babel/plugin-transform-shorthand-properties@npm:^7.24.7, @babel/plugin-transform-shorthand-properties@npm:^7.27.1":
   version: 7.27.1
   resolution: "@babel/plugin-transform-shorthand-properties@npm:7.27.1"
   dependencies:
@@ -1322,7 +1322,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/plugin-transform-template-literals@npm:^7.0.0-0, @babel/plugin-transform-template-literals@npm:^7.27.1":
+"@babel/plugin-transform-template-literals@npm:^7.27.1":
   version: 7.27.1
   resolution: "@babel/plugin-transform-template-literals@npm:7.27.1"
   dependencies:
@@ -1382,7 +1382,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/plugin-transform-unicode-regex@npm:^7.0.0-0, @babel/plugin-transform-unicode-regex@npm:^7.24.7, @babel/plugin-transform-unicode-regex@npm:^7.27.1":
+"@babel/plugin-transform-unicode-regex@npm:^7.24.7, @babel/plugin-transform-unicode-regex@npm:^7.27.1":
   version: 7.27.1
   resolution: "@babel/plugin-transform-unicode-regex@npm:7.27.1"
   dependencies:
@@ -1515,7 +1515,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/preset-typescript@npm:^7.16.7, @babel/preset-typescript@npm:^7.23.0, @babel/preset-typescript@npm:^7.24.7":
+"@babel/preset-typescript@npm:^7.23.0, @babel/preset-typescript@npm:^7.24.7":
   version: 7.28.5
   resolution: "@babel/preset-typescript@npm:7.28.5"
   dependencies:
@@ -2727,10 +2727,8 @@ __metadata:
     react-native: "npm:0.81.5"
     react-native-builder-bob: "npm:0.40.18"
     react-native-monorepo-config: "npm:0.3.3"
-    react-native-reanimated: "npm:4.1.6"
     react-native-safe-area-context: "npm:5.6.2"
     react-native-web: "npm:0.21.2"
-    react-native-worklets: "npm:0.5.1"
   languageName: unknown
   linkType: soft
 
@@ -2753,16 +2751,12 @@ __metadata:
     react: "npm:19.1.0"
     react-native: "npm:0.81.5"
     react-native-builder-bob: "npm:0.40.18"
-    react-native-reanimated: "npm:4.1.6"
     react-native-safe-area-context: "npm:5.6.2"
-    react-native-worklets: "npm:0.5.1"
     typescript: "npm:5.9.3"
   peerDependencies:
     react: ">=18.0.0"
     react-native: ">=0.76.0"
-    react-native-reanimated: ">=3.16.0"
     react-native-safe-area-context: ">=4.0.0"
-    react-native-worklets: ">=0.4.0"
   languageName: unknown
   linkType: soft
 
@@ -8214,21 +8208,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-native-reanimated@npm:4.1.6":
-  version: 4.1.6
-  resolution: "react-native-reanimated@npm:4.1.6"
-  dependencies:
-    react-native-is-edge-to-edge: "npm:^1.2.1"
-    semver: "npm:7.7.2"
-  peerDependencies:
-    "@babel/core": ^7.0.0-0
-    react: "*"
-    react-native: "*"
-    react-native-worklets: ">=0.5.0"
-  checksum: 10c0/924b3a3fc0e6b47b97491122689bc00d59c5c2abf90ba05dd811f1c6d59efb8fb83135e4fa4463241ff937450025b7b335af54ab5f35c15197efaaef90235e91
-  languageName: node
-  linkType: hard
-
 "react-native-safe-area-context@npm:5.6.2":
   version: 5.6.2
   resolution: "react-native-safe-area-context@npm:5.6.2"
@@ -8255,29 +8234,6 @@ __metadata:
     react: ^18.0.0 || ^19.0.0
     react-dom: ^18.0.0 || ^19.0.0
   checksum: 10c0/8c184fef0045c25deff765c8e80963454a5dffd8e389a9e11cf2fec9e769ff0f82c3d56d082b1897a7ded8374d9ae8a49dac7f09377a104f1995a5ddea645095
-  languageName: node
-  linkType: hard
-
-"react-native-worklets@npm:0.5.1":
-  version: 0.5.1
-  resolution: "react-native-worklets@npm:0.5.1"
-  dependencies:
-    "@babel/plugin-transform-arrow-functions": "npm:^7.0.0-0"
-    "@babel/plugin-transform-class-properties": "npm:^7.0.0-0"
-    "@babel/plugin-transform-classes": "npm:^7.0.0-0"
-    "@babel/plugin-transform-nullish-coalescing-operator": "npm:^7.0.0-0"
-    "@babel/plugin-transform-optional-chaining": "npm:^7.0.0-0"
-    "@babel/plugin-transform-shorthand-properties": "npm:^7.0.0-0"
-    "@babel/plugin-transform-template-literals": "npm:^7.0.0-0"
-    "@babel/plugin-transform-unicode-regex": "npm:^7.0.0-0"
-    "@babel/preset-typescript": "npm:^7.16.7"
-    convert-source-map: "npm:^2.0.0"
-    semver: "npm:7.7.2"
-  peerDependencies:
-    "@babel/core": ^7.0.0-0
-    react: "*"
-    react-native: "*"
-  checksum: 10c0/9eb9e6dea9abaf889400a6618355ef59af3075f5004a4bec9e4cba6dcfd13d8b63de0d4b29d75c00a3dcf5ad422e1bdb71636c75b1a2ad1c43d8b512f198bdab
   languageName: node
   linkType: hard
 
@@ -8656,15 +8612,6 @@ __metadata:
   version: 0.26.0
   resolution: "scheduler@npm:0.26.0"
   checksum: 10c0/5b8d5bfddaae3513410eda54f2268e98a376a429931921a81b5c3a2873aab7ca4d775a8caac5498f8cbc7d0daeab947cf923dbd8e215d61671f9f4e392d34356
-  languageName: node
-  linkType: hard
-
-"semver@npm:7.7.2":
-  version: 7.7.2
-  resolution: "semver@npm:7.7.2"
-  bin:
-    semver: bin/semver.js
-  checksum: 10c0/aca305edfbf2383c22571cb7714f48cadc7ac95371b4b52362fb8eeffdfbc0de0669368b82b2b15978f8848f01d7114da65697e56cd8c37b0dab8c58e543f9ea
   languageName: node
   linkType: hard
 
