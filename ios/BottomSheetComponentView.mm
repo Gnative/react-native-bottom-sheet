@@ -3,6 +3,7 @@
 
 #import <React/RCTConversions.h>
 #import <React/RCTFabricComponentsPlugins.h>
+#import <react/renderer/components/ReactNativeBottomSheetSpec/BottomSheetStateHelper.h>
 #import <react/renderer/components/ReactNativeBottomSheetSpec/ComponentDescriptors.h>
 #import <react/renderer/components/ReactNativeBottomSheetSpec/EventEmitters.h>
 #import <react/renderer/components/ReactNativeBottomSheetSpec/Props.h>
@@ -15,6 +16,8 @@ using namespace facebook::react;
 
 @implementation BottomSheetComponentView {
   BottomSheetContentView *_sheetView;
+  State::Shared _sheetState;
+  float _lastContentOffsetY;
 }
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
@@ -64,6 +67,11 @@ using namespace facebook::react;
   [super updateProps:props oldProps:oldProps];
 }
 
+- (void)updateState:(const State::Shared &)state oldState:(const State::Shared &)oldState
+{
+  _sheetState = state;
+}
+
 - (void)mountChildComponentView:(UIView<RCTComponentViewProtocol> *)childComponentView index:(NSInteger)index
 {
   [_sheetView mountChildComponentView:childComponentView atIndex:index];
@@ -90,12 +98,24 @@ using namespace facebook::react;
     auto emitter = std::static_pointer_cast<const BottomSheetViewEventEmitter>(_eventEmitter);
     emitter->onPositionChange({.position = static_cast<double>(position)});
   }
+
+  float contentOffsetY = static_cast<float>(self.bounds.size.height - position);
+  if (contentOffsetY == _lastContentOffsetY) {
+    return;
+  }
+  _lastContentOffsetY = contentOffsetY;
+
+  if (_sheetState) {
+    updateBottomSheetContentOffsetY(_sheetState, contentOffsetY);
+  }
 }
 
 - (void)prepareForRecycle
 {
   [super prepareForRecycle];
   [_sheetView resetSheetState];
+  _sheetState.reset();
+  _lastContentOffsetY = 0;
 }
 
 @end
