@@ -218,7 +218,9 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
   private var lastShadowOffsetY = Float.NaN
 
   private fun updateShadowState(translationY: Float) {
-    val offsetY = (translationY / density).toDouble()
+    val maxDetentHeight = detentSpecs.lastOrNull()?.height ?: height.toFloat()
+    val containerTop = height.toFloat() - maxDetentHeight
+    val offsetY = ((containerTop + translationY) / density).toDouble()
     if (offsetY.toFloat() == lastShadowOffsetY) return
     lastShadowOffsetY = offsetY.toFloat()
     val sw = stateWrapper ?: return

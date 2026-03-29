@@ -19,7 +19,7 @@ class JSI_EXPORT BottomSheetViewShadowNode final
   using ConcreteViewShadowNode::ConcreteViewShadowNode;
 
  public:
-  void adjustLayoutWithState();
+  Point getContentOriginOffset(bool includeTransform) const override;
 };
 
 } // namespace facebook::react
