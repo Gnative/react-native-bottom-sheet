@@ -51,6 +51,24 @@ public final class RNSBottomSheetHostingView: UIView {
     fatalError("init(coder:) has not been implemented")
   }
 
+  private weak var surfaceTouchHandler: UIGestureRecognizer?
+
+  public override func didMoveToWindow() {
+    super.didMoveToWindow()
+    surfaceTouchHandler = nil
+    guard window != nil else { return }
+    var current: UIView? = superview
+    while let view = current {
+      for gr in view.gestureRecognizers ?? [] {
+        if NSStringFromClass(type(of: gr)).contains("TouchHandler") {
+          surfaceTouchHandler = gr
+          return
+        }
+      }
+      current = view.superview
+    }
+  }
+
   public override func layoutSubviews() {
     super.layoutSubviews()
     guard bounds.width > 0, bounds.height > 0 else { return }
@@ -240,6 +258,10 @@ public final class RNSBottomSheetHostingView: UIView {
     case .began:
       isPanning = true
       setContentInteractionEnabled(false)
+      if let handler = surfaceTouchHandler {
+        handler.isEnabled = false
+        handler.isEnabled = true
+      }
       gesture.setTranslation(.zero, in: self)
       if let animator = activeAnimator {
         stopDisplayLink()
