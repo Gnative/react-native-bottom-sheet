@@ -43,7 +43,7 @@ public final class RNSBottomSheetHostingView: UIView {
     panGesture.delegate = self
     panGesture.cancelsTouchesInView = true
     panGesture.delaysTouchesBegan = true
-    panGesture.delaysTouchesEnded = true
+    panGesture.delaysTouchesEnded = false
     sheetContainer.addGestureRecognizer(panGesture)
   }
 
@@ -258,12 +258,20 @@ public final class RNSBottomSheetHostingView: UIView {
       sheetContainer.transform = CGAffineTransform(translationX: 0, y: newTy)
       emitPosition()
 
-    case .ended, .cancelled:
+    case .ended:
       isPanning = false
       let velocity = gesture.velocity(in: self).y
       let currentHeight = maxHeight - sheetContainer.transform.ty
       let index = bestSnapIndex(for: currentHeight, velocity: velocity)
       snapToIndex(index, velocity: velocity)
+
+    case .cancelled:
+      isPanning = false
+      setContentInteractionEnabled(true)
+      let cancelVelocity = gesture.velocity(in: self).y
+      let cancelHeight = maxHeight - sheetContainer.transform.ty
+      let cancelIndex = bestSnapIndex(for: cancelHeight, velocity: cancelVelocity)
+      snapToIndex(cancelIndex, velocity: cancelVelocity)
 
     case .failed:
       isPanning = false
@@ -312,7 +320,10 @@ public final class RNSBottomSheetHostingView: UIView {
     let velocity = panGesture.velocity(in: self)
     guard abs(velocity.y) > abs(velocity.x) else { return false }
 
-    let maxDraggableIndex = detentSpecs.indices.last(where: { !detentSpecs[$0].programmatic }) ?? 0
+    let draggable = detentSpecs.enumerated().filter { !$0.element.programmatic }
+    guard draggable.count > 1 else { return false }
+
+    let maxDraggableIndex = draggable.last?.offset ?? 0
     guard targetIndex >= maxDraggableIndex else { return true }
 
     if velocity.y < 0 {

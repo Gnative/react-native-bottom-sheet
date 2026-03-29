@@ -323,7 +323,7 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
         val dx = x - initialTouchX
         val dy = y - initialTouchY
 
-        if (abs(dy) > touchSlop && abs(dy) > abs(dx)) {
+        if (abs(dy) > touchSlop && abs(dy) > abs(dx) && draggableMinTy < draggableMaxTy) {
           if (!isAtMaxDraggable) {
             lastTouchY = y
             requestDisallowInterceptTouchEvent(false)
@@ -340,6 +340,7 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
       }
       MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
         initialTouchX = 0f
+        initialTouchY = 0f
         activePointerId = MotionEvent.INVALID_POINTER_ID
       }
     }
@@ -390,9 +391,10 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
       MotionEvent.ACTION_POINTER_UP -> {
         val actionIndex = event.actionIndex
         if (event.getPointerId(actionIndex) == activePointerId) {
-          val newIndex = if (actionIndex == 0) 1 else 0
-          activePointerId = event.getPointerId(newIndex)
-          lastTouchY = event.getY(newIndex)
+          val newPointerIndex = if (actionIndex == 0) 1 else 0
+          activePointerId = event.getPointerId(newPointerIndex)
+          lastTouchY = event.getY(newPointerIndex)
+          velocityTracker?.clear()
         }
         return true
       }
