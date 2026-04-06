@@ -64,6 +64,14 @@ using namespace facebook::react;
     _sheetView.animateIn = newViewProps.animateIn;
   }
 
+  if (newViewProps.modal != oldViewProps.modal) {
+    _sheetView.modal = newViewProps.modal;
+  }
+
+  if (newViewProps.scrimColor != oldViewProps.scrimColor) {
+    [_sheetView setScrimColor:RCTUIColorFromSharedColor(newViewProps.scrimColor)];
+  }
+
   [super updateProps:props oldProps:oldProps];
 }
 

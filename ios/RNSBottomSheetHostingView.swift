@@ -13,15 +13,25 @@ private struct DetentSpec {
 @objcMembers
 public final class RNSBottomSheetHostingView: UIView {
   public weak var eventDelegate: RNSBottomSheetHostingViewDelegate?
+  public var modal: Bool = false {
+    didSet { updateScrim() }
+  }
+  public var scrimColor: UIColor? = UIColor.black.withAlphaComponent(0.5) {
+    didSet { scrimView.backgroundColor = scrimColor }
+  }
 
   private var detentSpecs: [DetentSpec] = [] {
-    didSet { setNeedsLayout() }
+    didSet {
+      setNeedsLayout()
+      updateScrim()
+    }
   }
 
   private var targetIndex: Int = 0
   public var animateIn: Bool = true
 
   public let sheetContainer = UIView()
+  private let scrimView = UIControl()
   private var panGesture: UIPanGestureRecognizer!
   private var activeAnimator: UIViewPropertyAnimator?
   private var displayLink: CADisplayLink?
@@ -34,6 +44,12 @@ public final class RNSBottomSheetHostingView: UIView {
     super.init(frame: frame)
     backgroundColor = .clear
     clipsToBounds = false
+
+    scrimView.backgroundColor = scrimColor
+    scrimView.alpha = 0
+    scrimView.isHidden = true
+    scrimView.addTarget(self, action: #selector(handleScrimPress), for: .touchUpInside)
+    addSubview(scrimView)
 
     sheetContainer.backgroundColor = .clear
     sheetContainer.clipsToBounds = false
@@ -81,6 +97,7 @@ public final class RNSBottomSheetHostingView: UIView {
     super.layoutSubviews()
     guard bounds.width > 0, bounds.height > 0 else { return }
 
+    scrimView.frame = bounds
     let maxHeight = detentSpecs.last?.height ?? bounds.height
     sheetContainer.bounds = CGRect(x: 0, y: 0, width: bounds.width, height: maxHeight)
     sheetContainer.center = CGPoint(x: bounds.width / 2, y: bounds.height - maxHeight / 2)
@@ -106,6 +123,7 @@ public final class RNSBottomSheetHostingView: UIView {
 
     if activeAnimator != nil || isPanning { return }
     sheetContainer.transform = CGAffineTransform(translationX: 0, y: translationY(for: targetIndex))
+    updateScrim()
   }
 
   private var presentedSheetFrame: CGRect {
@@ -116,11 +134,20 @@ public final class RNSBottomSheetHostingView: UIView {
   }
 
   public override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
-    presentedSheetFrame.contains(point)
+    if presentedSheetFrame.contains(point) {
+      return true
+    }
+
+    return isScrimVisible && bounds.contains(point)
   }
 
   public override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
     guard self.point(inside: point, with: event) else { return nil }
+
+    if isScrimVisible && !presentedSheetFrame.contains(point) {
+      let scrimPoint = convert(point, to: scrimView)
+      return scrimView.hitTest(scrimPoint, with: event)
+    }
 
     let containerPoint = convert(point, to: sheetContainer)
     guard sheetContainer.bounds.contains(containerPoint) else { return nil }
@@ -169,6 +196,8 @@ public final class RNSBottomSheetHostingView: UIView {
     isPanning = false
     setContentInteractionEnabled(true)
     sheetContainer.transform = .identity
+    scrimView.alpha = 0
+    scrimView.isHidden = true
     for subview in sheetContainer.subviews {
       subview.removeFromSuperview()
     }
@@ -194,10 +223,31 @@ public final class RNSBottomSheetHostingView: UIView {
     return (minTy: translationY(for: highestIndex), maxTy: translationY(for: lowestIndex))
   }
 
+  private var closedIndex: Int? {
+    detentSpecs.firstIndex(where: { $0.height == 0 })
+  }
+
+  private var firstNonZeroDetentHeight: CGFloat {
+    detentSpecs.first(where: { $0.height > 0 })?.height ?? 0
+  }
+
+  private var currentSheetHeight: CGFloat {
+    let maxHeight = detentSpecs.last?.height ?? bounds.height
+    let ty = sheetContainer.layer.presentation()?.affineTransform().ty ?? sheetContainer.transform.ty
+    return maxHeight - ty
+  }
+
+  private var isScrimVisible: Bool {
+    modal && currentSheetHeight > 0.5
+  }
+
   private func emitPosition() {
     let maxHeight = detentSpecs.last?.height ?? bounds.height
     let ty = sheetContainer.layer.presentation()?.affineTransform().ty ?? sheetContainer.transform.ty
-    eventDelegate?.bottomSheetHostingView(self, didChangePosition: maxHeight - ty)
+    let position = maxHeight - ty
+    updateScrim(forPosition: position)
+    updateInteractionState()
+    eventDelegate?.bottomSheetHostingView(self, didChangePosition: position)
   }
 
   private func startDisplayLink() {
@@ -227,6 +277,19 @@ public final class RNSBottomSheetHostingView: UIView {
     emitPosition()
   }
 
+  @objc private func handleScrimPress() {
+    guard
+      modal,
+      let closedIndex,
+      targetIndex != closedIndex,
+      activeAnimator == nil || currentSheetHeight > 0.5
+    else {
+      return
+    }
+
+    snapToIndex(closedIndex, velocity: 0)
+  }
+
   private func snapToIndex(_ index: Int, velocity: CGFloat) {
     guard index >= 0, index < detentSpecs.count else { return }
     targetIndex = index
@@ -252,6 +315,7 @@ public final class RNSBottomSheetHostingView: UIView {
       self.emitPosition()
       self.activeAnimator = nil
       self.setContentInteractionEnabled(true)
+      self.updateInteractionState()
       self.eventDelegate?.bottomSheetHostingView(self, didChangeIndex: index)
     }
     animator.startAnimation()
@@ -397,5 +461,34 @@ extension RNSBottomSheetHostingView: UIGestureRecognizerDelegate {
     shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
   ) -> Bool {
     return false
+  }
+}
+
+private extension RNSBottomSheetHostingView {
+  func updateScrim() {
+    updateScrim(forPosition: currentSheetHeight)
+    updateInteractionState()
+  }
+
+  func updateScrim(forPosition position: CGFloat) {
+    guard modal else {
+      scrimView.alpha = 0
+      scrimView.isHidden = true
+      return
+    }
+
+    let threshold = firstNonZeroDetentHeight
+    let progress: CGFloat
+    if threshold <= 0 {
+      progress = 0
+    } else {
+      progress = min(1, max(0, position / threshold))
+    }
+    scrimView.alpha = progress
+    scrimView.isHidden = progress <= 0.001
+  }
+
+  func updateInteractionState() {
+    scrimView.isUserInteractionEnabled = modal && (closedIndex != nil) && !scrimView.isHidden
   }
 }

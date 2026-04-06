@@ -40,6 +40,16 @@
   return _impl.sheetContainer;
 }
 
+- (BOOL)modal
+{
+  return _impl.modal;
+}
+
+- (void)setModal:(BOOL)modal
+{
+  _impl.modal = modal;
+}
+
 - (void)setDetents:(NSArray<NSDictionary *> *)raw
 {
   [_impl setDetents:raw];
@@ -48,6 +58,11 @@
 - (void)setDetentIndex:(NSInteger)newIndex
 {
   [_impl setDetentIndex:newIndex];
+}
+
+- (void)setScrimColor:(UIColor *)color
+{
+  _impl.scrimColor = color;
 }
 
 - (void)mountChildComponentView:(UIView *)childView atIndex:(NSInteger)index

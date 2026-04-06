@@ -1,12 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from 'react-native';
-import {
-  Animated,
-  Pressable,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Animated, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import BottomSheetNativeComponent from './BottomSheetNativeComponent';
@@ -14,23 +8,6 @@ import { Portal } from './BottomSheetProvider';
 import { type Detent, resolveDetent } from './bottomSheetUtils';
 export type { Detent, DetentValue } from './bottomSheetUtils';
 export { programmatic } from './bottomSheetUtils';
-
-const DefaultScrim = ({
-  progress,
-  color,
-}: {
-  progress: Animated.Value;
-  color: string;
-}) => {
-  return (
-    <Animated.View
-      style={[
-        StyleSheet.absoluteFill,
-        { flex: 1, backgroundColor: color, opacity: progress },
-      ]}
-    />
-  );
-};
 
 export interface BottomSheetProps {
   children: ReactNode;
@@ -55,12 +32,10 @@ export const BottomSheet = ({
   modal = false,
   scrimColor = 'rgba(0, 0, 0, 0.5)',
 }: BottomSheetProps) => {
-  const { height: screenHeight } = useWindowDimensions();
+  const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const maxHeight = screenHeight - insets.top;
+  const maxHeight = windowHeight - insets.top;
   const [contentHeight, setContentHeight] = useState(0);
-  const currentPositionRef = useRef(0);
-  const scrimProgress = useRef(new Animated.Value(0)).current;
   const sheetOpacity = useRef(new Animated.Value(0)).current;
 
   const resolvedDetents = detents.map((detent) => {
@@ -77,45 +52,6 @@ export const BottomSheet = ({
 
   const clampedIndex = Math.max(0, Math.min(index, resolvedDetents.length - 1));
   const isCollapsed = (resolvedDetents[clampedIndex]?.height ?? 0) === 0;
-  const scrimPressEnabledRef = useRef(!modal || isCollapsed);
-  const previousIsCollapsedRef = useRef(isCollapsed);
-  const firstNonzeroDetent =
-    resolvedDetents.find((detent) => detent.height > 0)?.height ?? 0;
-
-  useEffect(() => {
-    const progress =
-      firstNonzeroDetent <= 0
-        ? 0
-        : Math.min(
-            1,
-            Math.max(0, currentPositionRef.current / firstNonzeroDetent)
-          );
-    scrimProgress.setValue(progress);
-  }, [firstNonzeroDetent, scrimProgress]);
-
-  useEffect(() => {
-    if (!modal) {
-      scrimPressEnabledRef.current = true;
-      previousIsCollapsedRef.current = isCollapsed;
-      return undefined;
-    }
-
-    if (previousIsCollapsedRef.current && !isCollapsed) {
-      scrimPressEnabledRef.current = false;
-      previousIsCollapsedRef.current = isCollapsed;
-
-      const frame = requestAnimationFrame(() => {
-        scrimPressEnabledRef.current = true;
-      });
-
-      return () => cancelAnimationFrame(frame);
-    }
-
-    scrimPressEnabledRef.current = !isCollapsed;
-    previousIsCollapsedRef.current = isCollapsed;
-    return undefined;
-  }, [isCollapsed, modal]);
-
   const handleIndexChange = (event: { nativeEvent: { index: number } }) => {
     onIndexChange?.(event.nativeEvent.index);
   };
@@ -124,45 +60,15 @@ export const BottomSheet = ({
     nativeEvent: { position: number };
   }) => {
     const height = event.nativeEvent.position;
-    currentPositionRef.current = height;
-    const progress =
-      firstNonzeroDetent <= 0
-        ? 0
-        : Math.min(1, Math.max(0, height / firstNonzeroDetent));
-    scrimProgress.setValue(progress);
     sheetOpacity.setValue(height === 0 ? 0 : 1);
     onPositionChange?.(height);
   };
-
-  const closedIndex = resolvedDetents.findIndex(
-    (detent) => detent.height === 0
-  );
-  const handleScrimPress = () => {
-    if (
-      closedIndex === -1 ||
-      clampedIndex === closedIndex ||
-      !scrimPressEnabledRef.current
-    ) {
-      return;
-    }
-
-    onIndexChange?.(closedIndex);
-  };
-
-  const scrimElement = modal ? (
-    <DefaultScrim progress={scrimProgress} color={scrimColor} />
-  ) : null;
 
   const sheet = (
     <Animated.View
       style={StyleSheet.absoluteFill}
       pointerEvents={modal ? (isCollapsed ? 'none' : 'auto') : 'box-none'}
     >
-      {modal && scrimElement !== null ? (
-        <Pressable style={StyleSheet.absoluteFill} onPress={handleScrimPress}>
-          {scrimElement}
-        </Pressable>
-      ) : null}
       <Animated.View
         pointerEvents="box-none"
         style={[StyleSheet.absoluteFill, { opacity: sheetOpacity }]}
@@ -175,13 +81,18 @@ export const BottomSheet = ({
               left: 0,
               right: 0,
               bottom: 0,
-              height: maxHeight,
+              // The native host always spans the full height of its container.
+              // Detents are still capped to `maxHeight`, so the sheet itself
+              // never extends under the status bar.
+              height: windowHeight,
             },
             style,
           ]}
           detents={resolvedDetents}
           index={index}
           animateIn={animateIn}
+          modal={modal}
+          scrimColor={scrimColor}
           onIndexChange={handleIndexChange}
           onPositionChange={handlePositionChange}
         >

@@ -109,6 +109,16 @@ class BottomSheetViewManager :
     view.animateIn = animateIn
   }
 
+  @ReactProp(name = "modal")
+  override fun setModal(view: BottomSheetView, modal: Boolean) {
+    view.modal = modal
+  }
+
+  @ReactProp(name = "scrimColor", customType = "Color")
+  override fun setScrimColor(view: BottomSheetView, scrimColor: Int?) {
+    view.setScrimColor(scrimColor)
+  }
+
   override fun onDropViewInstance(view: BottomSheetView) {
     super.onDropViewInstance(view)
     view.destroy()

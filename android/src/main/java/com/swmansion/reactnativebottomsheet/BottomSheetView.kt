@@ -1,6 +1,9 @@
 package com.swmansion.reactnativebottomsheet
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.view.Choreographer
 import android.view.MotionEvent
 import android.view.VelocityTracker
@@ -37,6 +40,12 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
   private var detentSpecs: List<DetentSpec> = emptyList()
   private var targetIndex: Int = 0
   var animateIn: Boolean = true
+  var modal: Boolean = false
+    set(value) {
+      field = value
+      updateInteractionState()
+      updateScrim()
+    }
   private var pendingIndex: Int? = null
   private var hasLaidOut = false
   private var isPanning = false
@@ -44,6 +53,7 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
   // MARK: - Internal
 
   private val sheetContainer = FrameLayout(context)
+  private val scrimPaint = Paint(Paint.ANTI_ALIAS_FLAG)
   private var activeAnimation: SpringAnimation? = null
   private var velocityTracker: VelocityTracker? = null
   private var choreographerCallback: Choreographer.FrameCallback? = null
@@ -55,6 +65,9 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
   private var initialTouchX = 0f
   private var lastTouchY = 0f
   private var activePointerId = MotionEvent.INVALID_POINTER_ID
+  private var scrimPressed = false
+  private var scrimColor = Color.argb(128, 0, 0, 0)
+  private var scrimProgress = 0f
 
   init {
     clipChildren = false
@@ -141,6 +154,11 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
     updateShadowState(sheetContainer.translationY)
   }
 
+  override fun dispatchDraw(canvas: Canvas) {
+    drawScrim(canvas)
+    super.dispatchDraw(canvas)
+  }
+
   private fun layoutSheetChildren() {
     for (i in 0 until sheetContainer.childCount) {
       val child = sheetContainer.getChildAt(i)
@@ -175,6 +193,7 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
     }
 
     requestLayout()
+    updateScrim()
   }
 
   fun setIndex(newIndex: Int) {
@@ -190,6 +209,11 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
     snapToIndex(newIndex, 0f)
   }
 
+  fun setScrimColor(color: Int?) {
+    scrimColor = color ?: Color.argb(128, 0, 0, 0)
+    invalidate()
+  }
+
   // MARK: - Snap logic
 
   private fun translationY(index: Int): Float {
@@ -197,6 +221,12 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
     val snapHeight = detentSpecs.getOrNull(index)?.height ?: 0f
     return maxHeight - snapHeight
   }
+
+  private val closedIndex: Int?
+    get() = detentSpecs.indexOfFirst { it.height == 0f }.takeIf { it >= 0 }
+
+  private val firstNonZeroDetentHeight: Float
+    get() = detentSpecs.firstOrNull { it.height > 0f }?.height ?: 0f
 
   private val draggableMinTy: Float
     get() {
@@ -216,7 +246,10 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
   private fun emitPosition() {
     val maxHeight = detentSpecs.lastOrNull()?.height ?: height.toFloat()
     val ty = sheetContainer.translationY
-    listener?.onPositionChange(((maxHeight - ty) / density).toDouble())
+    val position = maxHeight - ty
+    updateScrim(position)
+    updateInteractionState()
+    listener?.onPositionChange((position / density).toDouble())
     updateShadowState(ty)
   }
 
@@ -276,6 +309,7 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
         stopChoreographer()
         emitPosition()
         activeAnimation = null
+        updateInteractionState()
         listener?.onIndexChange(index)
       }
     }
@@ -308,6 +342,13 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
   override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
     val sheetTop = sheetContainer.top + sheetContainer.translationY
     if (ev.actionMasked == MotionEvent.ACTION_DOWN && ev.y < sheetTop) {
+      if (isScrimVisible()) {
+        initialTouchX = ev.x
+        initialTouchY = ev.y
+        lastTouchY = ev.y
+        scrimPressed = true
+        return true
+      }
       return false
     }
 
@@ -350,12 +391,37 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
         initialTouchX = 0f
         initialTouchY = 0f
         activePointerId = MotionEvent.INVALID_POINTER_ID
+        scrimPressed = false
       }
     }
     return false
   }
 
   override fun onTouchEvent(event: MotionEvent): Boolean {
+    if (scrimPressed) {
+      when (event.actionMasked) {
+        MotionEvent.ACTION_MOVE -> {
+          val sheetTop = sheetContainer.top + sheetContainer.translationY
+          if (event.y >= sheetTop || abs(event.y - initialTouchY) > touchSlop) {
+            scrimPressed = false
+          }
+          return true
+        }
+        MotionEvent.ACTION_UP -> {
+          val closeIndex = closedIndex
+          scrimPressed = false
+          if (closeIndex != null && isScrimVisible()) {
+            snapToIndex(closeIndex, 0f)
+          }
+          return true
+        }
+        MotionEvent.ACTION_CANCEL -> {
+          scrimPressed = false
+          return true
+        }
+      }
+    }
+
     when (event.actionMasked) {
       MotionEvent.ACTION_MOVE -> {
         if (!isPanning) beginPan(event)
@@ -480,9 +546,51 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
     initialTouchX = 0f
     lastTouchY = 0f
     activePointerId = MotionEvent.INVALID_POINTER_ID
+    scrimPressed = false
     sheetContainer.translationY = 0f
+    scrimProgress = 0f
     sheetContainer.removeAllViews()
     stateWrapper = null
     lastShadowOffsetY = Float.NaN
+  }
+
+  private fun updateScrim(position: Float = currentSheetHeight()) {
+    if (!modal) {
+      scrimProgress = 0f
+      invalidate()
+      return
+    }
+
+    val threshold = firstNonZeroDetentHeight
+    scrimProgress =
+      if (threshold <= 0f) 0f else (position / threshold).coerceIn(0f, 1f)
+    invalidate()
+  }
+
+  private fun updateInteractionState() {
+    pointerEvents =
+      if (modal && (activeAnimation != null || isPanning || isScrimVisible())) {
+        PointerEvents.AUTO
+      } else {
+        PointerEvents.BOX_NONE
+      }
+  }
+
+  private fun currentSheetHeight(): Float {
+    val maxHeight = detentSpecs.lastOrNull()?.height ?: height.toFloat()
+    return maxHeight - sheetContainer.translationY
+  }
+
+  private fun isScrimVisible(): Boolean = modal && currentSheetHeight() > 1f
+
+  private fun drawScrim(canvas: Canvas) {
+    if (!modal || scrimProgress <= 0.001f) {
+      return
+    }
+
+    val alpha = (Color.alpha(scrimColor) * scrimProgress).toInt().coerceIn(0, 255)
+    scrimPaint.color =
+      Color.argb(alpha, Color.red(scrimColor), Color.green(scrimColor), Color.blue(scrimColor))
+    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), scrimPaint)
   }
 }
