@@ -162,6 +162,30 @@ public final class RNSBottomSheetHostingView: UIView {
       let programmatic = (dict["programmatic"] as? Bool) ?? (dict["programmatic"] as? NSNumber)?.boolValue ?? false
       return DetentSpec(height: CGFloat(height), programmatic: programmatic)
     }
+    guard bounds.width > 0, bounds.height > 0, !detentSpecs.isEmpty else {
+      return
+    }
+
+    if hasLaidOut && !isPanning {
+      targetIndex = max(0, min(detentSpecs.count - 1, targetIndex))
+      layoutIfNeeded()
+
+      if let animator = activeAnimator {
+        stopDisplayLink()
+        let visualTy = sheetContainer.layer.presentation()?.affineTransform().ty ?? sheetContainer.transform.ty
+        animator.stopAnimation(true)
+        activeAnimator = nil
+        sheetContainer.transform = CGAffineTransform(
+          translationX: 0,
+          y: min(max(visualTy, 0), detentSpecs.last?.height ?? visualTy)
+        )
+        emitPosition()
+        snapToIndex(targetIndex, velocity: 0, emitIndexChange: false, emitSettle: false)
+      } else {
+        sheetContainer.transform = CGAffineTransform(translationX: 0, y: translationY(for: targetIndex))
+        emitPosition()
+      }
+    }
   }
 
   public func setDetentIndex(_ newIndex: Int) {

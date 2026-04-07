@@ -181,14 +181,24 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
       val programmatic = dict["programmatic"] as? Boolean ?: false
       DetentSpec(height = (height * density).toFloat(), programmatic = programmatic)
     }
-
     if (width > 0 && height > 0 && detentSpecs.isNotEmpty()) {
       layoutSheetContainer(width, height)
 
-      if (hasLaidOut && activeAnimation == null && !isPanning) {
+      if (hasLaidOut && !isPanning) {
         targetIndex = targetIndex.coerceIn(0, detentSpecs.size - 1)
-        sheetContainer.translationY = translationY(targetIndex)
-        emitPosition()
+        if (activeAnimation != null) {
+          val currentTy = sheetContainer.translationY
+          activeAnimation?.cancel()
+          activeAnimation = null
+          stopChoreographer()
+          sheetContainer.translationY =
+            currentTy.coerceIn(0f, detentSpecs.lastOrNull()?.height ?: currentTy)
+          emitPosition()
+          snapToIndex(targetIndex, 0f, emitIndexChange = false, emitSettle = false)
+        } else {
+          sheetContainer.translationY = translationY(targetIndex)
+          emitPosition()
+        }
       }
     }
 
@@ -298,7 +308,6 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
     targetIndex = index
 
     val targetTy = translationY(index)
-
     activeAnimation?.cancel()
 
     val spring = SpringAnimation(sheetContainer, DynamicAnimation.TRANSLATION_Y, targetTy).apply {

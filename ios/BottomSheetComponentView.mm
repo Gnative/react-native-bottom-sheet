@@ -18,6 +18,7 @@ using namespace facebook::react;
   BottomSheetContentView *_sheetView;
   State::Shared _sheetState;
   float _lastContentOffsetY;
+  BOOL _needsIndexSyncAfterRecycle;
 }
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
@@ -30,6 +31,7 @@ using namespace facebook::react;
   if (self = [super initWithFrame:frame]) {
     static const auto defaultProps = std::make_shared<const BottomSheetViewProps>();
     _props = defaultProps;
+    _needsIndexSyncAfterRecycle = NO;
 
     _sheetView = [[BottomSheetContentView alloc] initWithFrame:CGRectZero];
     _sheetView.delegate = self;
@@ -56,8 +58,9 @@ using namespace facebook::react;
     [_sheetView setDetents:detentsArray];
   }
 
-  if (newViewProps.index != oldViewProps.index) {
+  if (_needsIndexSyncAfterRecycle || newViewProps.index != oldViewProps.index) {
     [_sheetView setDetentIndex:newViewProps.index];
+    _needsIndexSyncAfterRecycle = NO;
   }
 
   if (newViewProps.animateIn != oldViewProps.animateIn) {
@@ -129,6 +132,7 @@ using namespace facebook::react;
 - (void)prepareForRecycle
 {
   [super prepareForRecycle];
+  _needsIndexSyncAfterRecycle = YES;
   [_sheetView resetSheetState];
   _sheetState.reset();
   _lastContentOffsetY = 0;
