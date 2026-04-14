@@ -443,9 +443,15 @@ public final class RNSBottomSheetHostingView: UIView {
     })?.offset ?? targetIndex
   }
 
+  private func isVerticallyScrollable(_ scrollView: UIScrollView) -> Bool {
+    let verticalInset = scrollView.adjustedContentInset.top + scrollView.adjustedContentInset.bottom
+    let visibleHeight = max(0, scrollView.bounds.height - verticalInset)
+    return scrollView.alwaysBounceVertical || scrollView.contentSize.height > visibleHeight
+  }
+
   private func firstScrollView(in view: UIView) -> UIScrollView? {
     for subview in view.subviews {
-      if let scrollView = subview as? UIScrollView {
+      if let scrollView = subview as? UIScrollView, isVerticallyScrollable(scrollView) {
         return scrollView
       }
       if let found = firstScrollView(in: subview) {
