@@ -24,6 +24,11 @@
       "edgeToEdgeEnabled": true,
       "package": "com.swmansion.reactnativebottomsheet.example"
     },
-    "web": { "favicon": "./assets/favicon.png" }
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router"
+    ]
   }
 }

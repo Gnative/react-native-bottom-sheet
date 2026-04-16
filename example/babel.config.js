@@ -6,5 +6,11 @@ const root = path.resolve(__dirname, '..');
 
 module.exports = function (api) {
   api.cache(true);
-  return getConfig({ presets: ['babel-preset-expo'] }, { root, pkg });
+  return getConfig(
+    {
+      presets: ['babel-preset-expo'],
+      plugins: ['react-native-reanimated/plugin'],
+    },
+    { root, pkg }
+  );
 };
