@@ -133,6 +133,22 @@ Detents are the points to which the sheet snaps. Each detent is either a number
 (a fixed height in pixels) or `'content'` (the sheet’s content height, capped by
 the available screen height). The default detents are `[0, 'content']`.
 
+Sheet children are laid out in a flex container. For a full&zwj;-&zwj;height
+sheet, apply `flex: 1` to your sheet surface and use the
+`'content'`&nbsp;detent:
+
+```tsx
+<BottomSheet
+  // `detents` defaults to `[0, 'content']`.
+  index={index}
+  onIndexChange={setIndex}
+>
+  <View style={{ flex: 1, backgroundColor: 'white' }}>
+    {/* Full-height sheet content. */}
+  </View>
+</BottomSheet>
+```
+
 The `index` prop is a zero&zwj;-&zwj;based index into the `detents` array.
 `onIndexChange` and `onSettle` have different&nbsp;responsibilities:
 
