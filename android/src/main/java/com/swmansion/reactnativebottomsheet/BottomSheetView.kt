@@ -62,6 +62,7 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
   private var pendingIndex: Int? = null
   private var hasLaidOut = false
   private var isPanning = false
+  private var panStartingIndex: Int? = null
 
   // MARK: - Internal
 
@@ -393,20 +394,29 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
   private val isTargetingClosedDetent: Boolean
     get() = closedIndex?.let { targetIndex == it } == true
 
-  private val draggableMinTy: Float
-    get() {
-      val highestIndex = detentSpecs.indices.lastOrNull { !detentSpecs[it].programmatic } ?: 0
-      return translationY(highestIndex)
+  private fun snapCandidateIndices(includeIndex: Int? = null): List<Int> {
+    val indices = detentSpecs.indices.filter { !detentSpecs[it].programmatic }.toMutableList()
+    if (
+      includeIndex != null &&
+        includeIndex in detentSpecs.indices &&
+        detentSpecs[includeIndex].programmatic
+    ) {
+      indices.add(includeIndex)
     }
+    return indices.distinct().sortedBy { detentSpecs[it].height }
+  }
 
-  private val draggableMaxTy: Float
-    get() {
-      val lowestIndex = detentSpecs.indices.firstOrNull { !detentSpecs[it].programmatic } ?: 0
-      return translationY(lowestIndex)
-    }
+  private fun draggableRange(includeIndex: Int? = null): ClosedFloatingPointRange<Float> {
+    val candidates = snapCandidateIndices(includeIndex)
+    if (candidates.isEmpty()) return 0f..0f
+    val translations = candidates.map(::translationY)
+    return (translations.minOrNull() ?: 0f)..(translations.maxOrNull() ?: 0f)
+  }
 
-  private val isAtMaxDraggable: Boolean
-    get() = sheetContainer.translationY <= draggableMinTy + 1f
+  private fun isAtMaxDragCandidate(includeIndex: Int? = null): Boolean {
+    val range = draggableRange(includeIndex)
+    return sheetContainer.translationY <= range.start + 1f
+  }
 
   private fun emitPosition() {
     val maxHeight = detentSpecs.maxOfOrNull { it.height } ?: resolvedMaxDetentHeight()
@@ -510,24 +520,24 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
     spring.start()
   }
 
-  private fun bestSnapIndex(currentHeight: Float, velocity: Float): Int {
-    val draggable = detentSpecs.withIndex().filter { !it.value.programmatic }
-    if (draggable.isEmpty()) return targetIndex
+  private fun bestSnapIndex(currentHeight: Float, velocity: Float, includeIndex: Int? = null): Int {
+    val candidates = snapCandidateIndices(includeIndex)
+    if (candidates.isEmpty()) return targetIndex
 
     val flickThreshold = 600f * density
 
     if (velocity < -flickThreshold) {
-      return draggable.firstOrNull { it.value.height > currentHeight }?.index
-        ?: draggable.lastOrNull()?.index
+      return candidates.firstOrNull { detentSpecs[it].height > currentHeight }
+        ?: candidates.lastOrNull()
         ?: targetIndex
     }
     if (velocity > flickThreshold) {
-      return draggable.lastOrNull { it.value.height < currentHeight }?.index
-        ?: draggable.firstOrNull()?.index
+      return candidates.lastOrNull { detentSpecs[it].height < currentHeight }
+        ?: candidates.firstOrNull()
         ?: targetIndex
     }
 
-    return draggable.minByOrNull { abs(it.value.height - currentHeight) }?.index ?: targetIndex
+    return candidates.minByOrNull { abs(detentSpecs[it].height - currentHeight) } ?: targetIndex
   }
 
   // MARK: - Touch handling
@@ -563,11 +573,12 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
         val dx = x - initialTouchX
         val dy = y - initialTouchY
 
-        if (abs(dy) > touchSlop && abs(dy) > abs(dx) && draggableMinTy < draggableMaxTy) {
+        val dragRange = draggableRange(targetIndex)
+        if (abs(dy) > touchSlop && abs(dy) > abs(dx) && dragRange.start < dragRange.endInclusive) {
           if (disableScrollableNegotiation && findScrollableAtTouch() != null) {
             return false
           }
-          if (!isAtMaxDraggable) {
+          if (!isAtMaxDragCandidate(targetIndex)) {
             lastTouchY = y
             requestDisallowInterceptTouchEvent(false)
             // Cancel in-flight JS touches. React Native's JSTouchDispatcher
@@ -640,7 +651,9 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
         val dy = y - lastTouchY
         lastTouchY = y
 
-        val newTy = (sheetContainer.translationY + dy).coerceIn(draggableMinTy, draggableMaxTy)
+        val dragRange = draggableRange(panStartingIndex)
+        val newTy =
+          (sheetContainer.translationY + dy).coerceIn(dragRange.start, dragRange.endInclusive)
         sheetContainer.translationY = newTy
         emitPosition()
         return true
@@ -659,7 +672,8 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
         velocityTracker = null
         val maxHeight = detentSpecs.maxOfOrNull { it.height } ?: resolvedMaxDetentHeight()
         val currentHeight = maxHeight - sheetContainer.translationY
-        val index = bestSnapIndex(currentHeight, velocity)
+        val index = bestSnapIndex(currentHeight, velocity, panStartingIndex)
+        panStartingIndex = null
         snapToIndex(index, velocity)
         return true
       }
@@ -679,6 +693,7 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
 
   private fun beginPan(event: MotionEvent) {
     isPanning = true
+    panStartingIndex = targetIndex
     activePointerId = event.getPointerId(0)
     lastTouchY = event.y
     velocityTracker?.recycle()
@@ -771,6 +786,7 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
     pendingIndex = null
     hasLaidOut = false
     isPanning = false
+    panStartingIndex = null
     initialTouchY = 0f
     initialTouchX = 0f
     lastTouchY = 0f

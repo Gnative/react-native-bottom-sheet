@@ -45,6 +45,10 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen
+            name="programmatic-detent-drag"
+            options={{ title: 'Programmatic detent drag', headerShown: false }}
+          />
+          <Stack.Screen
             name="dynamic-detents"
             options={{ title: 'Dynamic detent updates', headerShown: false }}
           />

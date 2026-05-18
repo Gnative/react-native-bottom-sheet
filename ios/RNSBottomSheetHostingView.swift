@@ -59,6 +59,7 @@ public final class RNSBottomSheetHostingView: UIView {
   private var pendingIndex: Int?
   private var hasLaidOut = false
   private var isPanning = false
+  private var panStartingIndex: Int?
   private var isContentInteractionDisabled = false
   private var contentHeightMarker: UIView?
   private static var markerObservationContext = 0
@@ -237,6 +238,7 @@ public final class RNSBottomSheetHostingView: UIView {
     pendingIndex = nil
     hasLaidOut = false
     isPanning = false
+    panStartingIndex = nil
     setContentInteractionEnabled(true)
     stopObservingContentHeightMarker()
     sheetContainer.transform = .identity
@@ -260,11 +262,27 @@ public final class RNSBottomSheetHostingView: UIView {
     return maxHeight - snapHeight
   }
 
-  private var draggableRange: (minTy: CGFloat, maxTy: CGFloat) {
-    let draggable = detentSpecs.enumerated().filter { !$0.element.programmatic }
-    let highestIndex = draggable.last?.offset ?? 0
-    let lowestIndex = draggable.first?.offset ?? 0
-    return (minTy: translationY(for: highestIndex), maxTy: translationY(for: lowestIndex))
+  private func snapCandidateIndices(including index: Int? = nil) -> [Int] {
+    var indices = detentSpecs.indices.filter { !detentSpecs[$0].programmatic }
+    if
+      let index,
+      detentSpecs.indices.contains(index),
+      detentSpecs[index].programmatic
+    {
+      indices.append(index)
+    }
+    return Array(Set(indices)).sorted {
+      detentSpecs[$0].height < detentSpecs[$1].height
+    }
+  }
+
+  private func draggableRange(including index: Int? = nil) -> (minTy: CGFloat, maxTy: CGFloat) {
+    let candidates = snapCandidateIndices(including: index)
+    guard !candidates.isEmpty else { return (minTy: 0, maxTy: 0) }
+    return (
+      minTy: candidates.map { translationY(for: $0) }.min() ?? 0,
+      maxTy: candidates.map { translationY(for: $0) }.max() ?? 0
+    )
   }
 
   private var closedIndex: Int? {
@@ -393,6 +411,7 @@ public final class RNSBottomSheetHostingView: UIView {
     switch gesture.state {
     case .began:
       isPanning = true
+      panStartingIndex = targetIndex
       sheetContainer.endEditing(true)
       setContentInteractionEnabled(false)
       if let handler = surfaceTouchHandler {
@@ -411,8 +430,9 @@ public final class RNSBottomSheetHostingView: UIView {
     case .changed:
       let delta = gesture.translation(in: self).y
       gesture.setTranslation(.zero, in: self)
-      let minTy = draggableRange.minTy
-      let maxTy = draggableRange.maxTy
+      let range = draggableRange(including: panStartingIndex)
+      let minTy = range.minTy
+      let maxTy = range.maxTy
       let newTy = max(minTy, min(maxTy, sheetContainer.transform.ty + delta))
       sheetContainer.transform = CGAffineTransform(translationX: 0, y: newTy)
       emitPosition()
@@ -421,7 +441,8 @@ public final class RNSBottomSheetHostingView: UIView {
       isPanning = false
       let velocity = gesture.velocity(in: self).y
       let currentHeight = maxHeight - sheetContainer.transform.ty
-      let index = bestSnapIndex(for: currentHeight, velocity: velocity)
+      let index = bestSnapIndex(for: currentHeight, velocity: velocity, including: panStartingIndex)
+      panStartingIndex = nil
       snapToIndex(index, velocity: velocity)
 
     case .cancelled:
@@ -429,11 +450,17 @@ public final class RNSBottomSheetHostingView: UIView {
       setContentInteractionEnabled(true)
       let cancelVelocity = gesture.velocity(in: self).y
       let cancelHeight = maxHeight - sheetContainer.transform.ty
-      let cancelIndex = bestSnapIndex(for: cancelHeight, velocity: cancelVelocity)
+      let cancelIndex = bestSnapIndex(
+        for: cancelHeight,
+        velocity: cancelVelocity,
+        including: panStartingIndex
+      )
+      panStartingIndex = nil
       snapToIndex(cancelIndex, velocity: cancelVelocity)
 
     case .failed:
       isPanning = false
+      panStartingIndex = nil
       setContentInteractionEnabled(true)
 
     default:
@@ -441,24 +468,28 @@ public final class RNSBottomSheetHostingView: UIView {
     }
   }
 
-  private func bestSnapIndex(for height: CGFloat, velocity: CGFloat) -> Int {
-    let draggable = detentSpecs.enumerated().filter { !$0.element.programmatic }
-    guard !draggable.isEmpty else { return targetIndex }
+  private func bestSnapIndex(
+    for height: CGFloat,
+    velocity: CGFloat,
+    including index: Int? = nil
+  ) -> Int {
+    let candidates = snapCandidateIndices(including: index)
+    guard !candidates.isEmpty else { return targetIndex }
 
     let flickThreshold: CGFloat = 600
 
     if velocity < -flickThreshold {
-      return draggable.first(where: { $0.element.height > height })?.offset
-        ?? draggable.last?.offset ?? targetIndex
+      return candidates.first(where: { detentSpecs[$0].height > height })
+        ?? candidates.last ?? targetIndex
     }
     if velocity > flickThreshold {
-      return draggable.last(where: { $0.element.height < height })?.offset
-        ?? draggable.first?.offset ?? targetIndex
+      return candidates.last(where: { detentSpecs[$0].height < height })
+        ?? candidates.first ?? targetIndex
     }
 
-    return draggable.min(by: {
-      abs($0.element.height - height) < abs($1.element.height - height)
-    })?.offset ?? targetIndex
+    return candidates.min(by: {
+      abs(detentSpecs[$0].height - height) < abs(detentSpecs[$1].height - height)
+    }) ?? targetIndex
   }
 
   private func isVerticallyScrollable(_ scrollView: UIScrollView) -> Bool {
@@ -498,8 +529,8 @@ public final class RNSBottomSheetHostingView: UIView {
     let velocity = panGesture.velocity(in: self)
     guard abs(velocity.y) > abs(velocity.x) else { return false }
 
-    let draggable = detentSpecs.enumerated().filter { !$0.element.programmatic }
-    guard draggable.count > 1 else { return false }
+    let candidates = snapCandidateIndices(including: targetIndex)
+    guard candidates.count > 1 else { return false }
 
     if disableScrollableNegotiation {
       let locationInContainer = panGesture.location(in: sheetContainer)
@@ -508,9 +539,9 @@ public final class RNSBottomSheetHostingView: UIView {
       }
     }
 
-    let maxDraggableIndex = draggable.last?.offset ?? 0
+    let maxCandidateHeight = candidates.map { detentSpecs[$0].height }.max() ?? 0
     // Below max: allow drag in either direction to reach other detents.
-    guard targetIndex >= maxDraggableIndex else { return true }
+    guard currentSheetHeight >= maxCandidateHeight - 0.5 else { return true }
     // At max: only allow downward drag, and only when the scroll view (if any)
     // is at its top edge — otherwise the scroll view should handle the gesture.
     if velocity.y < 0 {
