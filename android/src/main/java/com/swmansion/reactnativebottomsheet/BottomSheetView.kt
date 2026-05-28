@@ -337,14 +337,20 @@ class BottomSheetView(context: Context) : ReactViewGroup(context) {
         } else {
           val currentVisibleHeight = previousMaxHeight - sheetContainer.translationY
           val targetHeight = detentSpecs.getOrNull(targetIndex)?.height ?: 0f
-          if (targetHeight <= currentVisibleHeight + 0.5f) {
-            // Content shrank (or is unchanged): snap immediately. Animating here
-            // would expose blank space below the shrunken content.
+          val isContentDetent = rawDetentSpecs.getOrNull(targetIndex)?.kind == DetentKind.CONTENT
+          val didShrink = targetHeight < currentVisibleHeight - 0.5f
+          if (isContentDetent && didShrink) {
+            // Content shrank: snap immediately. Animating here would expose
+            // blank space below the shrunken content.
+            sheetContainer.translationY = targetTy
+            emitPosition()
+          } else if (kotlin.math.abs(targetHeight - currentVisibleHeight) <= 0.5f) {
+            // No meaningful change.
             sheetContainer.translationY = targetTy
             emitPosition()
           } else {
-            // Content grew: re-anchor at the current visible height, then animate
-            // up to the taller detent.
+            // Detent value changed (or content grew): re-anchor at the current
+            // visible height, then animate to the new target.
             sheetContainer.translationY =
               (newMaxHeight - currentVisibleHeight).coerceIn(0f, newMaxHeight)
             scrimPinnedFull = scrimPinnedFull || wasScrimFull

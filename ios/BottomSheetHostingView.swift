@@ -669,14 +669,21 @@ public final class BottomSheetHostingView: UIView {
       } else {
         let currentVisibleHeight = previousMaxHeight - currentTranslationY
         let targetHeight = detent(at: targetIndex).height
-        if targetHeight <= currentVisibleHeight + 0.5 {
-          // Content shrank (or is unchanged): snap immediately. Animating here
-          // would expose blank space below the shrunken content.
+        let isContentDetent = rawDetentSpecs.indices.contains(targetIndex)
+          && rawDetentSpecs[targetIndex].kind == .content
+        let didShrink = targetHeight < currentVisibleHeight - 0.5
+        if isContentDetent, didShrink {
+          // Content shrank: snap immediately. Animating here would expose blank
+          // space below the shrunken content.
+          sheetContainer.transform = CGAffineTransform(translationX: 0, y: targetTy)
+          emitPosition()
+        } else if abs(targetHeight - currentVisibleHeight) <= 0.5 {
+          // No meaningful change.
           sheetContainer.transform = CGAffineTransform(translationX: 0, y: targetTy)
           emitPosition()
         } else {
-          // Content grew: re-anchor at the current visible height, then animate
-          // up to the taller detent.
+          // Detent value changed (or content grew): re-anchor at the current
+          // visible height, then animate to the new target.
           let startTy = min(max(newMaxHeight - currentVisibleHeight, 0), newMaxHeight)
           sheetContainer.transform = CGAffineTransform(translationX: 0, y: startTy)
           scrimPinnedFull = scrimPinnedFull || wasScrimFull
