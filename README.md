@@ -37,15 +37,16 @@ Gesture Handler. Because scroll coordination is native, regular React Native
 scrollables work inside the sheet without
 bottom&zwj;-&zwj;sheet&zwj;-&zwj;specific list components or wrapper factories.
 
-[Expo UI](https://docs.expo.dev/versions/latest/sdk/ui) sheets and native
-modal&zwj;-&zwj;sheet libraries such as
+[Expo UI](https://docs.expo.dev/versions/latest/sdk/ui) sheets,
+[Expo Router form sheets](https://docs.expo.dev/router/advanced/modals/#form-sheet),
+and native modal&zwj;-&zwj;sheet libraries such as
 [True Sheet](https://sheet.lodev09.com) lean into platform presentation APIs.
 That is a good fit when you want a system&zwj;-&zwj;style presented sheet, but it
-also means the platform decides more of the behavior. React Native Bottom Sheet
-is built as a lower&zwj;-&zwj;level sheet primitive instead: The same native
-implementation powers both persistent inline sheets and modal sheets, your
-children provide the complete sheet surface, and detents can include
-app&zwj;-&zwj;level behavior such as programmatic&zwj;-&zwj;only snap&nbsp;points.
+also means the platform and presentation system decide more of the behavior.
+React Native Bottom Sheet is built as a lower&zwj;-&zwj;level sheet primitive instead:
+The same native implementation powers both persistent inline sheets and modal
+sheets, your children provide the complete sheet surface, and detents can
+include app&zwj;-&zwj;level behavior such as programmatic&zwj;-&zwj;only snap&nbsp;points.
 
 That difference also matters for layering. A platform&zwj;-&zwj;presented sheet can
 disable dimming and allow background interaction, but it is still drawn as a
