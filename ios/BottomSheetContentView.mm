@@ -95,6 +95,16 @@
   [_impl unmountChildComponentView:childView];
 }
 
+- (void)mountSurfaceComponentView:(UIView *)surfaceView atIndex:(NSInteger)index
+{
+  [_impl mountSurfaceComponentView:surfaceView atIndex:index];
+}
+
+- (void)unmountSurfaceComponentView:(UIView *)surfaceView
+{
+  [_impl unmountSurfaceComponentView:surfaceView];
+}
+
 - (void)resetSheetState
 {
   [_impl resetSheetState];

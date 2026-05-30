@@ -37,7 +37,7 @@ export const SheetBackground = ({
   children,
   style,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
   style?: ComponentProps<typeof View>['style'];
 }) => (
   <View

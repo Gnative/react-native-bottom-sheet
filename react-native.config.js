@@ -3,7 +3,10 @@ module.exports = {
     platforms: {
       android: {
         libraryName: 'ReactNativeBottomSheetSpec',
-        componentDescriptors: ['BottomSheetViewComponentDescriptor'],
+        componentDescriptors: [
+          'BottomSheetViewComponentDescriptor',
+          'BottomSheetSurfaceViewComponentDescriptor',
+        ],
         cmakeListsPath: 'src/main/jni/CMakeLists.txt',
       },
     },

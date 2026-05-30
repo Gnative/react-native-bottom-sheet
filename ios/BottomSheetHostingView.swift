@@ -65,6 +65,7 @@ public final class BottomSheetHostingView: UIView {
   private var panStartingIndex: Int?
   private var isContentInteractionDisabled = false
   private var contentHeightMarker: UIView?
+  private weak var surfaceView: UIView?
   private static var markerObservationContext = 0
 
   override public init(frame: CGRect) {
@@ -127,9 +128,15 @@ public final class BottomSheetHostingView: UIView {
 
     scrimView.frame = bounds
     refreshDetentsFromLayout()
-    let maxHeight = maximumResolvedDetentHeight ?? resolvedMaxDetentHeight
+    let maxHeight = sheetContainerHeight
     sheetContainer.bounds = CGRect(x: 0, y: 0, width: bounds.width, height: maxHeight)
     sheetContainer.center = CGPoint(x: bounds.width / 2, y: bounds.height - maxHeight / 2)
+
+    // The surface fills the full container so it always covers the visible sheet
+    // (the container is translated to the current sheet position), regardless of
+    // how short the content becomes. Sized from the top via frame — never via
+    // anchorPoint.
+    surfaceView?.frame = sheetContainer.bounds
 
     if !hasLaidOut && !detentSpecs.isEmpty {
       let indexToApply = pendingIndex ?? targetIndex
@@ -138,7 +145,7 @@ public final class BottomSheetHostingView: UIView {
       if animateIn, isInvalidContentDetentTarget(clampedIndex) {
         targetIndex = clampedIndex
         pendingIndex = clampedIndex
-        let closedTy = maximumResolvedDetentHeight ?? bounds.height
+        let closedTy = sheetContainerHeight
         sheetContainer.transform = CGAffineTransform(translationX: 0, y: closedTy)
         emitPosition()
         return
@@ -149,7 +156,7 @@ public final class BottomSheetHostingView: UIView {
       targetIndex = clampedIndex
 
       if animateIn {
-        let closedTy = maximumResolvedDetentHeight ?? bounds.height
+        let closedTy = sheetContainerHeight
         sheetContainer.transform = CGAffineTransform(translationX: 0, y: closedTy)
         emitPosition()
         snapToIndex(targetIndex, velocity: 0, emitIndexChange: false, emitSettle: true)
@@ -231,6 +238,22 @@ public final class BottomSheetHostingView: UIView {
     setNeedsLayout()
   }
 
+  public func mountSurfaceComponentView(_ childView: UIView, atIndex index: Int) {
+    surfaceView = childView
+    sheetContainer.insertSubview(childView, at: index)
+    refreshContentHeightMarker()
+    setNeedsLayout()
+  }
+
+  public func unmountSurfaceComponentView(_ childView: UIView) {
+    if surfaceView === childView {
+      surfaceView = nil
+    }
+    childView.removeFromSuperview()
+    refreshContentHeightMarker()
+    setNeedsLayout()
+  }
+
   public func resetSheetState() {
     activeAnimator?.stopAnimation(true)
     activeAnimator = nil
@@ -244,6 +267,7 @@ public final class BottomSheetHostingView: UIView {
     panStartingIndex = nil
     setContentInteractionEnabled(true)
     stopObservingContentHeightMarker()
+    surfaceView = nil
     sheetContainer.transform = .identity
     scrimView.alpha = 0
     scrimView.isHidden = true
@@ -260,7 +284,7 @@ public final class BottomSheetHostingView: UIView {
   }
 
   private func translationY(for index: Int) -> CGFloat {
-    let maxHeight = maximumResolvedDetentHeight ?? resolvedMaxDetentHeight
+    let maxHeight = sheetContainerHeight
     let snapHeight = detent(at: index).height
     return maxHeight - snapHeight
   }
@@ -297,13 +321,13 @@ public final class BottomSheetHostingView: UIView {
   }
 
   private var currentSheetHeight: CGFloat {
-    let maxHeight = maximumResolvedDetentHeight ?? resolvedMaxDetentHeight
+    let maxHeight = sheetContainerHeight
     let ty = currentTranslationY
     return maxHeight - ty
   }
 
   public var currentContentOffsetY: CGFloat {
-    let maxHeight = maximumResolvedDetentHeight ?? resolvedMaxDetentHeight
+    let maxHeight = sheetContainerHeight
     let containerTop = bounds.height - maxHeight
     let ty = currentTranslationY
     return containerTop + ty
@@ -314,7 +338,7 @@ public final class BottomSheetHostingView: UIView {
   }
 
   private func emitPosition() {
-    let maxHeight = maximumResolvedDetentHeight ?? resolvedMaxDetentHeight
+    let maxHeight = sheetContainerHeight
     let ty = currentTranslationY
     let position = maxHeight - ty
     updateScrim(forPosition: position)
@@ -414,7 +438,7 @@ public final class BottomSheetHostingView: UIView {
   }
 
   @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
-    let maxHeight = maximumResolvedDetentHeight ?? resolvedMaxDetentHeight
+    let maxHeight = sheetContainerHeight
 
     switch gesture.state {
     case .began:
@@ -576,8 +600,14 @@ public final class BottomSheetHostingView: UIView {
     return min(max(0, maxDetentHeight), bounds.height)
   }
 
-  private var maximumResolvedDetentHeight: CGFloat? {
-    detentSpecs.map(\.height).max()
+  /// Stable coordinate base for the sheet container. The container is sized to
+  /// the full available height rather than the tallest detent, so it stays a
+  /// fixed-size canvas: when content — and thus the `content` detent — shrinks,
+  /// the container does not collapse underneath the sheet, leaving room to
+  /// animate the sheet down to its new height. The surface fills this canvas, so
+  /// the area below the shrunken content stays covered throughout.
+  private var sheetContainerHeight: CGFloat {
+    resolvedMaxDetentHeight
   }
 
   private func resolveDetentSpecs() -> [DetentSpec]? {
@@ -627,7 +657,7 @@ public final class BottomSheetHostingView: UIView {
       return
     }
 
-    let previousMaxHeight = maximumResolvedDetentHeight ?? resolvedMaxDetentHeight
+    let previousMaxHeight = sheetContainerHeight
     // Whether the scrim is currently fully opaque, i.e. the sheet is settled at
     // or above the first non-zero detent. If so, a detent resize must not dip
     // the scrim while the sheet re-anchors to the new geometry.
@@ -642,7 +672,7 @@ public final class BottomSheetHostingView: UIView {
 
     if hasLaidOut, !isPanning {
       targetIndex = max(0, min(detentSpecs.count - 1, targetIndex))
-      let newMaxHeight = maximumResolvedDetentHeight ?? resolvedMaxDetentHeight
+      let newMaxHeight = sheetContainerHeight
       let targetTy = translationY(for: targetIndex)
 
       if let animator = activeAnimator {
@@ -669,21 +699,14 @@ public final class BottomSheetHostingView: UIView {
       } else {
         let currentVisibleHeight = previousMaxHeight - currentTranslationY
         let targetHeight = detent(at: targetIndex).height
-        let isContentDetent = rawDetentSpecs.indices.contains(targetIndex)
-          && rawDetentSpecs[targetIndex].kind == .content
-        let didShrink = targetHeight < currentVisibleHeight - 0.5
-        if isContentDetent, didShrink {
-          // Content shrank: snap immediately. Animating here would expose blank
-          // space below the shrunken content.
-          sheetContainer.transform = CGAffineTransform(translationX: 0, y: targetTy)
-          emitPosition()
-        } else if abs(targetHeight - currentVisibleHeight) <= 0.5 {
+        if abs(targetHeight - currentVisibleHeight) <= 0.5 {
           // No meaningful change.
           sheetContainer.transform = CGAffineTransform(translationX: 0, y: targetTy)
           emitPosition()
         } else {
-          // Detent value changed (or content grew): re-anchor at the current
-          // visible height, then animate to the new target.
+          // The content detent changed (grew or shrank): re-anchor at the
+          // current visible height, then animate to the new target. The surface
+          // covers the full sheet, so a shrink no longer exposes blank space.
           let startTy = min(max(newMaxHeight - currentVisibleHeight, 0), newMaxHeight)
           sheetContainer.transform = CGAffineTransform(translationX: 0, y: startTy)
           scrimPinnedFull = scrimPinnedFull || wasScrimFull
@@ -748,7 +771,10 @@ public final class BottomSheetHostingView: UIView {
   }
 
   private func findContentHeightMarker() -> UIView? {
-    guard let contentView = sheetContainer.subviews.first else { return nil }
+    // The surface is a sibling of the content wrapper; skip it so the marker is
+    // always read from the content, never from the surface.
+    guard let contentView = sheetContainer.subviews.first(where: { $0 !== surfaceView })
+    else { return nil }
     return contentView.subviews.last
   }
 

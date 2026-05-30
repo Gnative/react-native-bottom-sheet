@@ -1,5 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Button, FlatList, ScrollView, Text, View } from 'react-native';
+import {
+  Button,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {
   BottomSheet,
   ModalBottomSheet,
@@ -51,19 +58,18 @@ export const BasicModalScreen = () => {
           index={index}
           onIndexChange={setIndex}
           scrimColor={MODAL_SCRIM_COLOR}
+          surface={<SheetBackground style={StyleSheet.absoluteFill} />}
         >
-          <SheetBackground>
-            <SheetHeader title="Basic modal" onClose={() => setIndex(0)} />
-            <View
-              style={{
-                height: SECTION_HEIGHT,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text>Swipe down or tap scrim to dismiss</Text>
-            </View>
-          </SheetBackground>
+          <SheetHeader title="Basic modal" onClose={() => setIndex(0)} />
+          <View
+            style={{
+              height: SECTION_HEIGHT,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text>Swipe down or tap scrim to dismiss</Text>
+          </View>
         </ModalBottomSheet>
       }
     >
@@ -83,18 +89,17 @@ export const ModalScrollViewScreen = () => {
           index={index}
           onIndexChange={setIndex}
           scrimColor={MODAL_SCRIM_COLOR}
+          surface={<SheetBackground style={StyleSheet.absoluteFill} />}
         >
-          <SheetBackground style={{ flex: 1 }}>
-            <SheetHeader
-              title="Modal with ScrollView"
-              onClose={() => setIndex(0)}
-            />
-            <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-              {DATA.map((item, itemIndex) => (
-                <ListRow key={item.id} item={item} index={itemIndex} />
-              ))}
-            </ScrollView>
-          </SheetBackground>
+          <SheetHeader
+            title="Modal with ScrollView"
+            onClose={() => setIndex(0)}
+          />
+          <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+            {DATA.map((item, itemIndex) => (
+              <ListRow key={item.id} item={item} index={itemIndex} />
+            ))}
+          </ScrollView>
         </ModalBottomSheet>
       }
     >
@@ -114,21 +119,20 @@ export const ModalFlatListScreen = () => {
           index={index}
           onIndexChange={setIndex}
           scrimColor={MODAL_SCRIM_COLOR}
+          surface={<SheetBackground style={StyleSheet.absoluteFill} />}
         >
-          <SheetBackground style={{ flex: 1 }}>
-            <SheetHeader
-              title="Modal with FlatList"
-              onClose={() => setIndex(0)}
-            />
-            <FlatList
-              data={DATA}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingBottom: 24 }}
-              renderItem={({ item, index: itemIndex }) => (
-                <ListRow item={item} index={itemIndex} />
-              )}
-            />
-          </SheetBackground>
+          <SheetHeader
+            title="Modal with FlatList"
+            onClose={() => setIndex(0)}
+          />
+          <FlatList
+            data={DATA}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ paddingBottom: 24 }}
+            renderItem={({ item, index: itemIndex }) => (
+              <ListRow item={item} index={itemIndex} />
+            )}
+          />
         </ModalBottomSheet>
       }
     >
@@ -148,33 +152,32 @@ export const InlineDetentsScreen = () => {
           detents={[0, SHEET_HEADER_HEIGHT + SECTION_HEIGHT, 'content']}
           index={index}
           onIndexChange={setIndex}
+          surface={<SheetBackground style={StyleSheet.absoluteFill} />}
         >
-          <SheetBackground>
-            <SheetHeader
-              title="Inline with detents"
-              onClose={() => setIndex(0)}
-            />
-            <View
-              style={{
-                height: SECTION_HEIGHT,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text>Section 1</Text>
-            </View>
-            <View
-              style={{
-                height: SECTION_HEIGHT,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderTopWidth: 1,
-                borderTopColor: '#eee',
-              }}
-            >
-              <Text>Section 2</Text>
-            </View>
-          </SheetBackground>
+          <SheetHeader
+            title="Inline with detents"
+            onClose={() => setIndex(0)}
+          />
+          <View
+            style={{
+              height: SECTION_HEIGHT,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text>Section 1</Text>
+          </View>
+          <View
+            style={{
+              height: SECTION_HEIGHT,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderTopWidth: 1,
+              borderTopColor: '#eee',
+            }}
+          >
+            <Text>Section 2</Text>
+          </View>
         </BottomSheet>
       }
     >
@@ -199,21 +202,20 @@ export const InlineFlatListScreen = () => {
           ]}
           index={index}
           onIndexChange={setIndex}
+          surface={<SheetBackground style={StyleSheet.absoluteFill} />}
         >
-          <SheetBackground style={{ flex: 1 }}>
-            <SheetHeader
-              title="Inline with FlatList"
-              onClose={() => setIndex(0)}
-            />
-            <FlatList
-              data={DATA}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingBottom: 24 }}
-              renderItem={({ item, index: itemIndex }) => (
-                <ListRow item={item} index={itemIndex} />
-              )}
-            />
-          </SheetBackground>
+          <SheetHeader
+            title="Inline with FlatList"
+            onClose={() => setIndex(0)}
+          />
+          <FlatList
+            data={DATA}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ paddingBottom: 24 }}
+            renderItem={({ item, index: itemIndex }) => (
+              <ListRow item={item} index={itemIndex} />
+            )}
+          />
         </BottomSheet>
       }
     >
@@ -229,56 +231,58 @@ export const InvalidDetentsScreen = () => {
     <DemoScreen
       title="Invalid detents"
       sheet={
-        <BottomSheet detents={[120, 360, 'content']} index={1}>
-          <SheetBackground>
-            <View>
+        <BottomSheet
+          detents={[120, 360, 'content']}
+          index={1}
+          surface={<SheetBackground style={StyleSheet.absoluteFill} />}
+        >
+          <View>
+            <View
+              style={{
+                alignItems: 'center',
+                paddingTop: 8,
+                paddingBottom: 4,
+              }}
+            >
               <View
                 style={{
-                  alignItems: 'center',
-                  paddingTop: 8,
-                  paddingBottom: 4,
+                  width: 36,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: '#ddd',
                 }}
-              >
-                <View
-                  style={{
-                    width: 36,
-                    height: 4,
-                    borderRadius: 2,
-                    backgroundColor: '#ddd',
-                  }}
-                />
-              </View>
-              <View
-                style={{
-                  height: 64,
-                  justifyContent: 'center',
-                  paddingHorizontal: 20,
-                  borderBottomWidth: 1,
-                  borderBottomColor: '#eee',
-                }}
-              >
-                <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
-                  Invalid detents
-                </Text>
-              </View>
+              />
             </View>
             <View
               style={{
-                height: INVALID_DETENTS_CONTENT_HEIGHT,
-                paddingHorizontal: 20,
+                height: 64,
                 justifyContent: 'center',
-                gap: 12,
+                paddingHorizontal: 20,
+                borderBottomWidth: 1,
+                borderBottomColor: '#eee',
               }}
             >
-              <Text style={{ fontSize: 18, fontWeight: '600' }}>
-                This sheet should not be allowed.
-              </Text>
-              <Text style={{ fontSize: 15, lineHeight: 22, color: '#555' }}>
-                The 360pt detent is taller than the measured sheet content, so
-                the native view should report an invalid detent error.
+              <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
+                Invalid detents
               </Text>
             </View>
-          </SheetBackground>
+          </View>
+          <View
+            style={{
+              height: INVALID_DETENTS_CONTENT_HEIGHT,
+              paddingHorizontal: 20,
+              justifyContent: 'center',
+              gap: 12,
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: '600' }}>
+              This sheet should not be allowed.
+            </Text>
+            <Text style={{ fontSize: 15, lineHeight: 22, color: '#555' }}>
+              The 360pt detent is taller than the measured sheet content, so the
+              native view should report an invalid detent error.
+            </Text>
+          </View>
         </BottomSheet>
       }
     >
@@ -304,39 +308,38 @@ export const DisableScrollableNegotiationScreen = () => {
           index={index}
           onIndexChange={setIndex}
           disableScrollableNegotiation
+          surface={<SheetBackground style={StyleSheet.absoluteFill} />}
         >
-          <SheetBackground style={{ flex: 1 }}>
-            <SheetHeader
-              title="Disable scrollable negotiation"
-              onClose={() => setIndex(0)}
-            />
-            <View
-              style={{
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                borderBottomWidth: 1,
-                borderBottomColor: '#eee',
-                gap: 6,
-              }}
-            >
-              <Text style={{ fontSize: 15, fontWeight: '600' }}>
-                Gestures that start in the list stay with the list.
-              </Text>
-              <Text style={{ fontSize: 14, lineHeight: 20, color: '#555' }}>
-                Try dragging on the rows when the list is already at the top or
-                bottom. The sheet should not take over. Drag on the header to
-                move the sheet instead.
-              </Text>
-            </View>
-            <FlatList
-              data={DATA}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingBottom: 24 }}
-              renderItem={({ item, index: itemIndex }) => (
-                <ListRow item={item} index={itemIndex} />
-              )}
-            />
-          </SheetBackground>
+          <SheetHeader
+            title="Disable scrollable negotiation"
+            onClose={() => setIndex(0)}
+          />
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: '#eee',
+              gap: 6,
+            }}
+          >
+            <Text style={{ fontSize: 15, fontWeight: '600' }}>
+              Gestures that start in the list stay with the list.
+            </Text>
+            <Text style={{ fontSize: 14, lineHeight: 20, color: '#555' }}>
+              Try dragging on the rows when the list is already at the top or
+              bottom. The sheet should not take over. Drag on the header to move
+              the sheet instead.
+            </Text>
+          </View>
+          <FlatList
+            data={DATA}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ paddingBottom: 24 }}
+            renderItem={({ item, index: itemIndex }) => (
+              <ListRow item={item} index={itemIndex} />
+            )}
+          />
         </BottomSheet>
       }
     >
@@ -362,30 +365,29 @@ export const ProgrammaticDetentDragScreen = () => {
           index={index}
           onIndexChange={setIndex}
           onPositionChange={setPosition}
+          surface={<SheetBackground style={StyleSheet.absoluteFill} />}
         >
-          <SheetBackground>
-            <SheetHeader
-              title="Programmatic detent drag"
-              onClose={() => setIndex(0)}
-            />
-            <View
-              style={{
-                height: 760,
-                paddingHorizontal: 20,
-                justifyContent: 'center',
-                gap: 12,
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: '600' }}>
-                Start at the programmatic detent
-              </Text>
-              <Text style={{ fontSize: 15, lineHeight: 22, color: '#555' }}>
-                Open to 720pt, then drag lightly downward. The sheet should not
-                jump to 320pt, and it should snap back to 720pt unless the drag
-                clearly commits downward.
-              </Text>
-            </View>
-          </SheetBackground>
+          <SheetHeader
+            title="Programmatic detent drag"
+            onClose={() => setIndex(0)}
+          />
+          <View
+            style={{
+              height: 760,
+              paddingHorizontal: 20,
+              justifyContent: 'center',
+              gap: 12,
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: '600' }}>
+              Start at the programmatic detent
+            </Text>
+            <Text style={{ fontSize: 15, lineHeight: 22, color: '#555' }}>
+              Open to 720pt, then drag lightly downward. The sheet should not
+              jump to 320pt, and it should snap back to 720pt unless the drag
+              clearly commits downward.
+            </Text>
+          </View>
         </BottomSheet>
       }
     >
@@ -432,30 +434,29 @@ export const DynamicDetentsScreen = () => {
           index={index}
           onIndexChange={setIndex}
           onPositionChange={setPosition}
+          surface={<SheetBackground style={StyleSheet.absoluteFill} />}
         >
-          <SheetBackground>
-            <SheetHeader
-              title="Dynamic detent updates"
-              onClose={() => setIndex(0)}
-            />
-            <View
-              style={{
-                height: 360,
-                paddingHorizontal: 20,
-                justifyContent: 'center',
-                gap: 12,
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: '600' }}>
-                Watch the middle detent animate
-              </Text>
-              <Text style={{ fontSize: 15, lineHeight: 22, color: '#555' }}>
-                With the sheet at index 1, tap the 200pt and 300pt buttons
-                above. The active detent should transition smoothly between the
-                two heights.
-              </Text>
-            </View>
-          </SheetBackground>
+          <SheetHeader
+            title="Dynamic detent updates"
+            onClose={() => setIndex(0)}
+          />
+          <View
+            style={{
+              height: 360,
+              paddingHorizontal: 20,
+              justifyContent: 'center',
+              gap: 12,
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: '600' }}>
+              Watch the middle detent animate
+            </Text>
+            <Text style={{ fontSize: 15, lineHeight: 22, color: '#555' }}>
+              With the sheet at index 1, tap the 200pt and 300pt buttons above.
+              The active detent should transition smoothly between the two
+              heights.
+            </Text>
+          </View>
         </BottomSheet>
       }
     >
@@ -509,45 +510,45 @@ export const DynamicContentHeightScreen = () => {
           onIndexChange={setIndex}
           onPositionChange={setPosition}
           scrimColor={MODAL_SCRIM_COLOR}
+          surface={<SheetBackground style={StyleSheet.absoluteFill} />}
         >
-          <SheetBackground>
-            <SheetHeader
-              title="Dynamic content height"
-              onClose={() => setIndex(0)}
+          <SheetHeader
+            title="Dynamic content height"
+            onClose={() => setIndex(0)}
+          />
+          <View style={{ padding: 20, gap: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: '600' }}>
+              Resize the content while the sheet is open
+            </Text>
+            <Text style={{ fontSize: 15, lineHeight: 22, color: '#555' }}>
+              Tap the buttons below to change the content height. Both growing
+              and shrinking should animate smoothly, with the surface keeping
+              the sheet covered so no blank space appears. The scrim should stay
+              fully opaque throughout — it must not dip while the sheet
+              re-anchors.
+            </Text>
+            <Button
+              title="Short content"
+              onPress={() => setContentHeight(SHORT_CONTENT_HEIGHT)}
             />
-            <View style={{ padding: 20, gap: 12 }}>
-              <Text style={{ fontSize: 18, fontWeight: '600' }}>
-                Resize the content while the sheet is open
+            <Button
+              title="Tall content"
+              onPress={() => setContentHeight(TALL_CONTENT_HEIGHT)}
+            />
+            <View
+              style={{
+                height: contentHeight,
+                borderRadius: 16,
+                backgroundColor: '#dbe7ff',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontWeight: '600', color: '#345' }}>
+                Resizable content · {contentHeight}pt
               </Text>
-              <Text style={{ fontSize: 15, lineHeight: 22, color: '#555' }}>
-                Tap the buttons below to change the content height. Growing
-                should animate; shrinking should snap immediately so no blank
-                space appears. The scrim should stay fully opaque throughout —
-                it must not dip while the sheet re-anchors.
-              </Text>
-              <Button
-                title="Short content"
-                onPress={() => setContentHeight(SHORT_CONTENT_HEIGHT)}
-              />
-              <Button
-                title="Tall content"
-                onPress={() => setContentHeight(TALL_CONTENT_HEIGHT)}
-              />
-              <View
-                style={{
-                  height: contentHeight,
-                  borderRadius: 16,
-                  backgroundColor: '#dbe7ff',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ fontWeight: '600', color: '#345' }}>
-                  Resizable content · {contentHeight}pt
-                </Text>
-              </View>
             </View>
-          </SheetBackground>
+          </View>
         </ModalBottomSheet>
       }
     >
@@ -583,28 +584,26 @@ export const NoAnimateInScreen = () => {
           detents={[0, SHEET_HEADER_HEIGHT + SECTION_HEIGHT, 'content']}
           index={index}
           onIndexChange={setIndex}
+          surface={<SheetBackground style={StyleSheet.absoluteFill} />}
         >
-          <SheetBackground>
-            <SheetHeader title="No animate in" onClose={() => setIndex(0)} />
-            <View
-              style={{
-                height: SECTION_HEIGHT,
-                paddingHorizontal: 20,
-                justifyContent: 'center',
-                gap: 12,
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: '600' }}>
-                Sheet should appear without sliding up
-              </Text>
-              <Text style={{ fontSize: 15, lineHeight: 22, color: '#555' }}>
-                With animateIn={'{false}'} and an initial index of 1, the sheet
-                should be at its detent immediately on first layout. Tap
-                "Remount sheet" to re-observe the initial layout — it must not
-                animate in.
-              </Text>
-            </View>
-          </SheetBackground>
+          <SheetHeader title="No animate in" onClose={() => setIndex(0)} />
+          <View
+            style={{
+              height: SECTION_HEIGHT,
+              paddingHorizontal: 20,
+              justifyContent: 'center',
+              gap: 12,
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: '600' }}>
+              Sheet should appear without sliding up
+            </Text>
+            <Text style={{ fontSize: 15, lineHeight: 22, color: '#555' }}>
+              With animateIn={'{false}'} and an initial index of 1, the sheet
+              should be at its detent immediately on first layout. Tap "Remount
+              sheet" to re-observe the initial layout — it must not animate in.
+            </Text>
+          </View>
         </BottomSheet>
       }
     >

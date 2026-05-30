@@ -19,4 +19,8 @@ class BottomSheetViewComponentDescriptor final
   }
 };
 
+// The surface needs no custom initial state, so this mirrors the codegen alias.
+using BottomSheetSurfaceViewComponentDescriptor =
+    ConcreteComponentDescriptor<BottomSheetSurfaceViewShadowNode>;
+
 } // namespace facebook::react

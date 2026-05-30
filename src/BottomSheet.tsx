@@ -4,6 +4,7 @@ import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import BottomSheetNativeComponent from './BottomSheetNativeComponent';
+import BottomSheetSurfaceNativeComponent from './BottomSheetSurfaceNativeComponent';
 import { Portal } from './BottomSheetProvider';
 import { type Detent } from './bottomSheetUtils';
 export type { Detent, DetentValue } from './bottomSheetUtils';
@@ -13,8 +14,20 @@ export { programmatic } from './bottomSheetUtils';
  * Props for the inline bottom-sheet component.
  */
 export interface BottomSheetProps {
-  /** Sheet contents, including any background or scrollable content. */
+  /** Sheet contents, including any scrollable content. */
   children: ReactNode;
+  /**
+   * Optional visual surface (background) rendered behind the content. The
+   * library sizes and positions the surface natively to cover the full sheet,
+   * independently of the content, so a shrinking content height never exposes
+   * blank space. Put a background View here instead of inside `children` when
+   * you want that shrink-safe behavior. When omitted, behavior is unchanged.
+   *
+   * Give the surface element a filling style such as `StyleSheet.absoluteFill`:
+   * it is mounted in a full-size host, so a surface sized only by its own
+   * content would collapse and not show.
+   */
+  surface?: ReactNode;
   /** Additional style applied to the native sheet host view. */
   style?: StyleProp<ViewStyle>;
   /** Snap points for the sheet. Defaults to `[0, 'content']`. */
@@ -44,6 +57,7 @@ export interface BottomSheetProps {
 /** Native bottom sheet that renders inline within the current screen layout. */
 export const BottomSheet = ({
   children,
+  surface,
   style,
   detents = [0, 'content'],
   index,
@@ -128,6 +142,15 @@ export const BottomSheet = ({
           onSettle={handleSettle}
           onPositionChange={handlePositionChange}
         >
+          {surface != null && (
+            <BottomSheetSurfaceNativeComponent
+              collapsable={false}
+              pointerEvents="box-none"
+              style={StyleSheet.absoluteFill}
+            >
+              {surface}
+            </BottomSheetSurfaceNativeComponent>
+          )}
           <View collapsable={false} style={{ flex: 1, maxHeight }}>
             {children}
             <View collapsable={false} pointerEvents="none" />

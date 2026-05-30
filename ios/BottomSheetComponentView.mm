@@ -1,5 +1,6 @@
 #import "BottomSheetComponentView.h"
 #import "BottomSheetContentView.h"
+#import "BottomSheetSurfaceComponentView.h"
 #import "../common/cpp/react/renderer/components/ReactNativeBottomSheetSpec/BottomSheetStateHelper.h"
 #import "../common/cpp/react/renderer/components/ReactNativeBottomSheetSpec/ComponentDescriptors.h"
 
@@ -95,12 +96,22 @@ using namespace facebook::react;
 
 - (void)mountChildComponentView:(UIView<RCTComponentViewProtocol> *)childComponentView index:(NSInteger)index
 {
-  [_sheetView mountChildComponentView:childComponentView atIndex:index];
+  // Identify the visual surface by component type so the host can own its
+  // geometry. Everything else is treated as content.
+  if ([childComponentView isKindOfClass:BottomSheetSurfaceComponentView.class]) {
+    [_sheetView mountSurfaceComponentView:childComponentView atIndex:index];
+  } else {
+    [_sheetView mountChildComponentView:childComponentView atIndex:index];
+  }
 }
 
 - (void)unmountChildComponentView:(UIView<RCTComponentViewProtocol> *)childComponentView index:(NSInteger)index
 {
-  [_sheetView unmountChildComponentView:childComponentView];
+  if ([childComponentView isKindOfClass:BottomSheetSurfaceComponentView.class]) {
+    [_sheetView unmountSurfaceComponentView:childComponentView];
+  } else {
+    [_sheetView unmountChildComponentView:childComponentView];
+  }
 }
 
 #pragma mark - BottomSheetContentViewDelegate

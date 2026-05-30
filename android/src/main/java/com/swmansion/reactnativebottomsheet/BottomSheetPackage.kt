@@ -10,5 +10,5 @@ class BottomSheetPackage : ReactPackage {
     emptyList()
 
   override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> =
-    listOf(BottomSheetViewManager())
+    listOf(BottomSheetViewManager(), BottomSheetSurfaceViewManager())
 }
