@@ -17,9 +17,11 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
       - run: npm install -g npm@latest
-      - run: corepack enable
-      - run: yarn install --immutable
-      - run: yarn prepare
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun run prepare
       - name: Resolve npm dist-tag
         run: |
           tag=$(node -p "const version = require('./package.json').version; const match = version.match(/^[^-]+-([0-9A-Za-z]+)(?:[.-].*)?$/); match ? match[1] : 'latest'")

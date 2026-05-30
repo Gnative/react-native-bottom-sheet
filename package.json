@@ -33,7 +33,7 @@
     "!**/.*"
   ],
   "scripts": {
-    "example": "yarn workspace @swmansion/react-native-bottom-sheet-example",
+    "example": "bun run --filter @swmansion/react-native-bottom-sheet-example",
     "clean": "del-cli lib",
     "prepare": "lefthook install && bob build",
     "typecheck": "tsc",
@@ -85,7 +85,7 @@
   "workspaces": [
     "example"
   ],
-  "packageManager": "yarn@4.11.0",
+  "packageManager": "bun@1.3.14",
   "react-native-builder-bob": {
     "source": "src",
     "output": "lib",

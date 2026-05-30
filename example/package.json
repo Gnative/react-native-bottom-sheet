@@ -28,7 +28,6 @@
   "devDependencies": {
     "@babel/core": "^7.29.0",
     "@types/babel__core": "^7",
-    "react-native-builder-bob": "0.40.18",
-    "react-native-monorepo-config": "0.3.3"
+    "react-native-builder-bob": "0.40.18"
   }
 }

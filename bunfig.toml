@@ -1,0 +1,5 @@
+[install]
+# Hoist dependencies into a flat node_modules, the layout React Native tooling
+# (Metro, CocoaPods autolinking, ESLint's legacy plugin resolution) expects.
+# This is the equivalent of Yarn's `nodeLinker: node-modules`.
+linker = "hoisted"
