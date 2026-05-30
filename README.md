@@ -69,7 +69,7 @@ relative to the&nbsp;provider.
 2. Ensure the peer dependency is&nbsp;installed:
 
    ```sh
-   npm i react-native-safe-area-context@^4.0.0
+   npm i react-native-safe-area-context
    ```
 
 3. Wrap your app with&nbsp;`BottomSheetProvider`:
