@@ -12,7 +12,7 @@ import {
   type PositionChangeEventData,
 } from '@swmansion/react-native-bottom-sheet';
 
-import { DemoScreen, SheetBackground, SheetHeader } from './demoShared';
+import { DemoScreen, SheetBackground, SheetHeader } from '../demoShared';
 
 const DETENTS = [0, 360, 600];
 const MAX_POSITION = DETENTS[DETENTS.length - 1]!;
