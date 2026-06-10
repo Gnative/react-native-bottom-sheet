@@ -189,10 +189,18 @@ public final class BottomSheetHostingView: UIView {
   }
 
   private var presentedSheetFrame: CGRect {
-    if activeSpring != nil, let presentation = sheetContainer.layer.presentation() {
-      return presentation.frame
-    }
-    return sheetContainer.frame
+    guard activeSpring != nil else { return sheetContainer.frame }
+    // Mid-settle, derive the on-screen frame from the spring instead of the
+    // presentation layer (which lags one commit behind right after a snap
+    // starts). The container's transform is translation-only.
+    let size = sheetContainer.bounds.size
+    let center = sheetContainer.center
+    return CGRect(
+      x: center.x - size.width / 2,
+      y: center.y - size.height / 2 + currentTranslationY,
+      width: size.width,
+      height: size.height
+    )
   }
 
   override public func point(inside point: CGPoint, with _: UIEvent?) -> Bool {
@@ -518,7 +526,7 @@ public final class BottomSheetHostingView: UIView {
 
   @discardableResult
   private func cancelActiveSpring() -> CGFloat {
-    let visualTy = sheetContainer.layer.presentation()?.affineTransform().ty ?? sheetContainer.transform.ty
+    let visualTy = currentTranslationY
     activeSpring = nil
     activeSpringEmitsSettle = false
     stopDisplayLink()
@@ -914,11 +922,15 @@ extension BottomSheetHostingView: UIGestureRecognizerDelegate {
 private extension BottomSheetHostingView {
   var currentTranslationY: CGFloat {
     // During a settle the modal is driven by a keyframe animation on the render
-    // server, so the live on-screen value lives on the presentation layer (the
-    // model `transform` already holds the final target). A drag assigns
-    // `transform` directly, so outside a settle the model value is correct.
-    if activeSpring != nil, let presentation = sheetContainer.layer.presentation() {
-      return presentation.affineTransform().ty
+    // server (the model `transform` already holds the final target), so read the
+    // analytical spring the keyframes were sampled from. The presentation layer
+    // is deliberately not used: right after a snap starts it still holds the
+    // previously committed transform, and that stale value (e.g. the identity
+    // transform from before the first layout) reads as a wide-open sheet — which
+    // briefly flashed the scrim on mount. A drag assigns `transform` directly,
+    // so outside a settle the model value is correct.
+    if let spring = activeSpring {
+      return spring.value(at: CACurrentMediaTime())
     }
     return sheetContainer.transform.ty
   }
@@ -935,6 +947,14 @@ private extension BottomSheetHostingView {
 
   func updateScrim(forPosition position: CGFloat) {
     guard modal else {
+      scrimView.alpha = 0
+      scrimView.isHidden = true
+      return
+    }
+
+    // Until the first layout places the sheet, the identity transform reads as
+    // a fully-open sheet; keep the scrim hidden until the sheet is positioned.
+    if !hasLaidOut {
       scrimView.alpha = 0
       scrimView.isHidden = true
       return
