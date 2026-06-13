@@ -228,6 +228,30 @@ content would collapse and not&nbsp;show.
 </BottomSheet>
 ```
 
+### Keyboard handling
+
+The sheet does not apply keyboard avoidance automatically. This keeps the
+component unopinionated and lets your app choose the keyboard strategy that
+matches its layout: resize content, add bottom padding, use a keyboard-aware
+scroll view, or rely on platform&nbsp;behavior.
+
+For a `'content'` detent, keyboard-driven padding changes the measured content
+height. If you animate that padding yourself, pass
+`animateContentResize={false}` so the sheet follows the animated content height
+instead of adding its own resize&nbsp;animation.
+
+```tsx
+<ModalBottomSheet
+  detents={[0, 'content']}
+  index={index}
+  onIndexChange={setIndex}
+  surface={/* ... */}
+  animateContentResize={false}
+>
+  {/* Content with keyboard-driven bottom padding. */}
+</ModalBottomSheet>
+```
+
 ### Scrollable negotiation
 
 By default, the sheet coordinates vertical gestures with nested scrollables,
