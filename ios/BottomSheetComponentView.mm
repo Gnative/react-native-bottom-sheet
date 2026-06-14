@@ -113,8 +113,8 @@ using namespace facebook::react;
     _sheetView.animateIn = newViewProps.animateIn;
   }
 
-  if (newViewProps.animateContentResize != oldViewProps.animateContentResize) {
-    _sheetView.animateContentResize = newViewProps.animateContentResize;
+  if (newViewProps.animateContentHeight != oldViewProps.animateContentHeight) {
+    _sheetView.animateContentHeight = newViewProps.animateContentHeight;
   }
 
   if (newViewProps.modal != oldViewProps.modal) {

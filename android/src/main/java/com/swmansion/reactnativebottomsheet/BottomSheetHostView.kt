@@ -58,7 +58,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   private var detentSpecs: List<DetentSpec> = emptyList()
   private var targetIndex: Int = 0
   var animateIn: Boolean = true
-  var animateContentResize: Boolean = true
+  var animateContentHeight: Boolean = true
   var modal: Boolean = false
     set(value) {
       field = value
@@ -373,12 +373,12 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
         } else {
           val currentVisibleHeight = previousMaxHeight - sheetContainer.translationY
           val targetHeight = detentSpecs.getOrNull(targetIndex)?.height ?: 0f
-          val shouldAnimateResize = shouldAnimateContentResize(targetIndex)
+          val shouldAnimateHeight = shouldAnimateContentHeight(targetIndex)
           if (kotlin.math.abs(targetHeight - currentVisibleHeight) <= 0.5f) {
             // No meaningful change.
             sheetContainer.translationY = targetTy
             emitPosition()
-          } else if (!shouldAnimateResize) {
+          } else if (!shouldAnimateHeight) {
             sheetContainer.translationY = targetTy
             emitPosition()
           } else {
@@ -406,8 +406,8 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     updateScrim()
   }
 
-  private fun shouldAnimateContentResize(index: Int): Boolean =
-    animateContentResize || rawDetentSpecs.getOrNull(index)?.kind != DetentKind.CONTENT
+  private fun shouldAnimateContentHeight(index: Int): Boolean =
+    animateContentHeight || rawDetentSpecs.getOrNull(index)?.kind != DetentKind.CONTENT
 
   private fun currentContentHeight(): Float {
     val marker = contentHeightMarker ?: return Float.NaN

@@ -18,7 +18,7 @@ export const DynamicContentHeightScreen = () => {
   const [index, setIndex] = useState(0);
   const [contentHeight, setContentHeight] = useState(SHORT_CONTENT_HEIGHT);
   const [position, setPosition] = useState(0);
-  const [animateContentResize, setAnimateContentResize] = useState(true);
+  const [animateContentHeight, setAnimateContentHeight] = useState(true);
   const sheetBottomPadding = useSheetBottomPadding(20);
   const animatedHeight = useRef(
     new Animated.Value(SHORT_CONTENT_HEIGHT)
@@ -28,7 +28,7 @@ export const DynamicContentHeightScreen = () => {
     setContentHeight(nextHeight);
     animatedHeight.stopAnimation();
 
-    if (animateContentResize) {
+    if (animateContentHeight) {
       animatedHeight.setValue(nextHeight);
       return;
     }
@@ -40,8 +40,8 @@ export const DynamicContentHeightScreen = () => {
     }).start();
   };
 
-  const updateAnimateContentResize = (nextValue: boolean) => {
-    setAnimateContentResize(nextValue);
+  const updateAnimateContentHeight = (nextValue: boolean) => {
+    setAnimateContentHeight(nextValue);
     if (nextValue) {
       animatedHeight.stopAnimation();
       animatedHeight.setValue(contentHeight);
@@ -53,7 +53,7 @@ export const DynamicContentHeightScreen = () => {
       title="Dynamic content height"
       sheet={
         <ModalBottomSheet
-          animateContentResize={animateContentResize}
+          animateContentHeight={animateContentHeight}
           detents={[0, 'content']}
           index={index}
           onIndexChange={setIndex}
@@ -72,15 +72,15 @@ export const DynamicContentHeightScreen = () => {
               Resize the content while the sheet is open
             </Text>
             <Text style={styles.description}>
-              When animateContentResize is on, the content snaps to its new
+              When animateContentHeight is on, the content snaps to its new
               height and the sheet animates. Turn it off when the content
               animates its own height and the sheet should follow immediately.
             </Text>
             <View style={styles.row}>
-              <Text style={styles.label}>animateContentResize</Text>
+              <Text style={styles.label}>animateContentHeight</Text>
               <Switch
-                value={animateContentResize}
-                onValueChange={updateAnimateContentResize}
+                value={animateContentHeight}
+                onValueChange={updateAnimateContentHeight}
               />
             </View>
             <Button
@@ -95,7 +95,7 @@ export const DynamicContentHeightScreen = () => {
               style={[
                 styles.resizable,
                 {
-                  height: animateContentResize ? contentHeight : animatedHeight,
+                  height: animateContentHeight ? contentHeight : animatedHeight,
                 },
               ]}
             >
@@ -110,7 +110,7 @@ export const DynamicContentHeightScreen = () => {
       <Button title="Open sheet" onPress={() => setIndex(1)} />
       <View style={styles.statePanel}>
         <Text style={styles.stateTitle}>Current state</Text>
-        <Text>animateContentResize: {String(animateContentResize)}</Text>
+        <Text>animateContentHeight: {String(animateContentHeight)}</Text>
         <Text>content height: {contentHeight}pt</Text>
         <Text>index: {index}</Text>
         <Text>position: {position.toFixed(0)}pt</Text>

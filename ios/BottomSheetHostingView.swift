@@ -64,7 +64,7 @@ public final class BottomSheetHostingView: UIView {
 
   private var targetIndex: Int = 0
   public var animateIn: Bool = true
-  public var animateContentResize: Bool = true
+  public var animateContentHeight: Bool = true
 
   public let sheetContainer = UIView()
   private let scrimView = UIControl()
@@ -802,12 +802,12 @@ public final class BottomSheetHostingView: UIView {
       } else {
         let currentVisibleHeight = previousMaxHeight - currentTranslationY
         let targetHeight = detent(at: targetIndex).height
-        let shouldAnimateResize = shouldAnimateContentResize(at: targetIndex)
+        let shouldAnimateHeight = shouldAnimateContentHeight(at: targetIndex)
         if abs(targetHeight - currentVisibleHeight) <= 0.5 {
           // No meaningful change.
           sheetContainer.transform = CGAffineTransform(translationX: 0, y: targetTy)
           emitPosition()
-        } else if !shouldAnimateResize {
+        } else if !shouldAnimateHeight {
           sheetContainer.transform = CGAffineTransform(translationX: 0, y: targetTy)
           emitPosition()
         } else {
@@ -830,11 +830,11 @@ public final class BottomSheetHostingView: UIView {
     }
   }
 
-  private func shouldAnimateContentResize(at index: Int) -> Bool {
+  private func shouldAnimateContentHeight(at index: Int) -> Bool {
     guard rawDetentSpecs.indices.contains(index) else {
-      return animateContentResize
+      return animateContentHeight
     }
-    return animateContentResize || rawDetentSpecs[index].kind != .content
+    return animateContentHeight || rawDetentSpecs[index].kind != .content
   }
 
   private func refreshContentHeightMarker() {

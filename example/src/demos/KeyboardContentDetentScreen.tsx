@@ -13,7 +13,7 @@ import {
 } from '../demoShared';
 
 const INITIAL_NOTE =
-  'Focus this field and keep typing. The content detent grows by the keyboard height, while animateContentResize={false} lets the sheet follow the keyboard without its own resize spring.';
+  'Focus this field and keep typing. The content detent grows by the keyboard height, while animateContentHeight={false} lets the sheet follow the keyboard without its own resize spring.';
 const CONTENT_BOTTOM_PADDING = 20;
 
 export const KeyboardContentDetentScreen = () => {
@@ -33,7 +33,7 @@ export const KeyboardContentDetentScreen = () => {
       title="Keyboard content detent"
       sheet={
         <ModalBottomSheet
-          animateContentResize={false}
+          animateContentHeight={false}
           detents={[0, 'content']}
           index={index}
           onIndexChange={setIndex}
@@ -61,7 +61,7 @@ export const KeyboardContentDetentScreen = () => {
       <View style={styles.statePanel}>
         <Text style={styles.stateTitle}>Current setup</Text>
         <Text>detents: [0, 'content']</Text>
-        <Text>animateContentResize: false</Text>
+        <Text>animateContentHeight: false</Text>
       </View>
     </DemoScreen>
   );

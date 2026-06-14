@@ -69,7 +69,7 @@ export interface BottomSheetProps {
    *
    * @default true
    */
-  animateContentResize?: boolean;
+  animateContentHeight?: boolean;
   /**
    * Whether the sheet may extend under the status bar when using full-height
    * detents. Defaults to `false`, so detents remain capped below the status bar.
@@ -154,7 +154,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
     detents = [0, 'content'],
     index,
     animateIn = true,
-    animateContentResize = true,
+    animateContentHeight = true,
     extendUnderStatusBar = false,
     onIndexChange,
     onSettle,
@@ -248,7 +248,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
           maxDetentHeight={maxHeight}
           index={index}
           animateIn={animateIn}
-          animateContentResize={animateContentResize}
+          animateContentHeight={animateContentHeight}
           modal={modal}
           nativeOverlay={usesNativeOverlay}
           disableScrollableNegotiation={disableScrollableNegotiation}

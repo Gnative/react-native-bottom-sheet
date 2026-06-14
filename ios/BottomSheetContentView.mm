@@ -35,14 +35,14 @@
   _impl.animateIn = animateIn;
 }
 
-- (BOOL)animateContentResize
+- (BOOL)animateContentHeight
 {
-  return _impl.animateContentResize;
+  return _impl.animateContentHeight;
 }
 
-- (void)setAnimateContentResize:(BOOL)animateContentResize
+- (void)setAnimateContentHeight:(BOOL)animateContentHeight
 {
-  _impl.animateContentResize = animateContentResize;
+  _impl.animateContentHeight = animateContentHeight;
 }
 
 - (UIView *)sheetContainer

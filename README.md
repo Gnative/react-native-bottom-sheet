@@ -210,8 +210,8 @@ changes. When content shrinks, the sheet animates to its new height without the
 background briefly exposing blank space behind the&nbsp;content.
 
 If your sheet content animates its own height, pass
-`animateContentResize={false}` to update the sheet position immediately when the
-active `'content'` detent changes&nbsp;size.
+`animateContentHeight={false}` to update the sheet position immediately when the
+active `'content'` detent changes&nbsp;height.
 
 Give the surface a filling style such as `StyleSheet.absoluteFill`. It is
 mounted in a full&zwj;-&zwj;size host, so a surface sized only by its own
@@ -238,7 +238,7 @@ scroll view, or rely on platform&nbsp;behavior.
 
 For a `'content'` detent, keyboard-driven padding changes the measured content
 height. If you animate that padding yourself, pass
-`animateContentResize={false}` so the sheet follows the animated content height
+`animateContentHeight={false}` so the sheet follows the animated content height
 instead of adding its own resize&nbsp;animation.
 
 ```tsx
@@ -247,7 +247,7 @@ instead of adding its own resize&nbsp;animation.
   index={index}
   onIndexChange={setIndex}
   surface={/* ... */}
-  animateContentResize={false}
+  animateContentHeight={false}
 >
   {/* Content with keyboard-driven bottom padding. */}
 </ModalBottomSheet>
