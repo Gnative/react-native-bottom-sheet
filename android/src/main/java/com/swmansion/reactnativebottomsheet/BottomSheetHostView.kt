@@ -71,6 +71,8 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   private var hasLaidOut = false
   private var isPanning = false
   private var panStartingIndex: Int? = null
+  private var activeDragRange: ClosedFloatingPointRange<Float>? = null
+  private var activeDragDetentSpecs: List<DetentSpec>? = null
 
   // MARK: - Internal
 
@@ -320,6 +322,10 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   }
 
   private fun refreshDetentsFromLayout() {
+    if (!isPanning) {
+      activeDragRange = null
+      activeDragDetentSpecs = null
+    }
     if (hasLaidOut && isInvalidContentDetentTarget(targetIndex)) {
       updateScrim()
       return
@@ -496,6 +502,30 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     return (translations.minOrNull() ?: 0f)..(translations.maxOrNull() ?: 0f)
   }
 
+  private fun snapshotTranslationY(index: Int, specs: List<DetentSpec>): Float {
+    val maxHeight = resolvedMaxDetentHeight()
+    val snapHeight = specs.getOrNull(index)?.height ?: 0f
+    return maxHeight - snapHeight
+  }
+
+  private fun snapshotCandidateIndices(includeIndex: Int?, specs: List<DetentSpec>): List<Int> {
+    val indices = specs.indices.filter { !specs[it].programmatic }.toMutableList()
+    if (includeIndex != null && includeIndex in specs.indices && specs[includeIndex].programmatic) {
+      indices.add(includeIndex)
+    }
+    return indices.distinct().sortedBy { specs[it].height }
+  }
+
+  private fun snapshotDraggableRange(
+    includeIndex: Int?,
+    specs: List<DetentSpec>,
+  ): ClosedFloatingPointRange<Float> {
+    val candidates = snapshotCandidateIndices(includeIndex, specs)
+    if (candidates.isEmpty()) return 0f..0f
+    val translations = candidates.map { snapshotTranslationY(it, specs) }
+    return (translations.minOrNull() ?: 0f)..(translations.maxOrNull() ?: 0f)
+  }
+
   private fun isAtMaxDragCandidate(includeIndex: Int? = null): Boolean {
     val range = draggableRange(includeIndex)
     return sheetContainer.translationY <= range.start + 1f
@@ -545,7 +575,6 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     emitIndexChange: Boolean = true,
     emitSettle: Boolean = true,
     preserveScrimPin: Boolean = false,
-    animationBounds: ClosedFloatingPointRange<Float>? = null,
   ) {
     if (index < 0 || index >= detentSpecs.size) return
     targetIndex = index
@@ -560,19 +589,10 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     activeAnimationEmitsSettle = emitSettle
     activeAnimation?.cancel()
 
-    var currentTy = sheetContainer.translationY
-    if (animationBounds != null) {
-      val clampedTy = currentTy.coerceIn(animationBounds.start, animationBounds.endInclusive)
-      if (clampedTy != currentTy) {
-        sheetContainer.translationY = clampedTy
-        currentTy = clampedTy
-        emitPosition()
-      }
-    }
+    val currentTy = sheetContainer.translationY
 
-    val minAnimationTy = animationBounds?.start ?: minOf(minDetentTranslationY, currentTy, targetTy)
-    val maxAnimationTy =
-      animationBounds?.endInclusive ?: maxOf(maxDetentTranslationY, currentTy, targetTy)
+    val minAnimationTy = minOf(minDetentTranslationY, currentTy, targetTy)
+    val maxAnimationTy = maxOf(maxDetentTranslationY, currentTy, targetTy)
     val distance = targetTy - currentTy
     val velocityRatio = if (distance != 0f) velocity / distance else 0f
     val initialVelocity = velocityRatio.coerceIn(-5f, 5f) * distance
@@ -636,6 +656,31 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     }
 
     return candidates.minByOrNull { abs(detentSpecs[it].height - currentHeight) } ?: targetIndex
+  }
+
+  private fun snapshotBestSnapIndex(
+    currentHeight: Float,
+    velocity: Float,
+    includeIndex: Int?,
+    specs: List<DetentSpec>,
+  ): Int {
+    val candidates = snapshotCandidateIndices(includeIndex, specs)
+    if (candidates.isEmpty()) return targetIndex
+
+    val flickThreshold = 600f * density
+
+    if (velocity < -flickThreshold) {
+      return candidates.firstOrNull { specs[it].height > currentHeight }
+        ?: candidates.lastOrNull()
+        ?: targetIndex
+    }
+    if (velocity > flickThreshold) {
+      return candidates.lastOrNull { specs[it].height < currentHeight }
+        ?: candidates.firstOrNull()
+        ?: targetIndex
+    }
+
+    return candidates.minByOrNull { abs(specs[it].height - currentHeight) } ?: targetIndex
   }
 
   // MARK: - Touch handling
@@ -743,7 +788,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
         val dy = y - lastTouchY
         lastTouchY = y
 
-        val dragRange = draggableRange(panStartingIndex)
+        val dragRange = activeDragRange ?: draggableRange(panStartingIndex)
         val newTy =
           (sheetContainer.translationY + dy).coerceIn(dragRange.start, dragRange.endInclusive)
         sheetContainer.translationY = newTy
@@ -765,10 +810,15 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
         val maxHeight = resolvedMaxDetentHeight()
         val currentHeight = maxHeight - sheetContainer.translationY
         val startingIndex = panStartingIndex
-        val dragRange = draggableRange(startingIndex)
-        val index = bestSnapIndex(currentHeight, velocity, startingIndex)
+        val index =
+          activeDragDetentSpecs
+            ?.takeIf { it.size == detentSpecs.size }
+            ?.let { snapshotBestSnapIndex(currentHeight, velocity, startingIndex, it) }
+            ?: bestSnapIndex(currentHeight, velocity, startingIndex)
         panStartingIndex = null
-        snapToIndex(index, velocity, animationBounds = dragRange)
+        activeDragRange = null
+        activeDragDetentSpecs = null
+        snapToIndex(index, velocity)
         return true
       }
       MotionEvent.ACTION_POINTER_UP -> {
@@ -789,6 +839,9 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     isPanning = true
     scrimPinnedFull = false
     panStartingIndex = targetIndex
+    val dragDetentSpecs = detentSpecs.toList()
+    activeDragDetentSpecs = dragDetentSpecs
+    activeDragRange = snapshotDraggableRange(targetIndex, dragDetentSpecs)
     activePointerId = event.getPointerId(0)
     lastTouchY = event.y
     velocityTracker?.recycle()
@@ -937,6 +990,8 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     hasLaidOut = false
     isPanning = false
     panStartingIndex = null
+    activeDragRange = null
+    activeDragDetentSpecs = null
     initialTouchY = 0f
     initialTouchX = 0f
     lastTouchY = 0f

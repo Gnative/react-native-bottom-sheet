@@ -89,6 +89,8 @@ public final class BottomSheetHostingView: UIView {
   private var isPanning = false
   private var lastReportedInvalidDetentMessage: String?
   private var panStartingIndex: Int?
+  private var activeDragRange: (minTy: CGFloat, maxTy: CGFloat)?
+  private var activeDragDetentSpecs: [DetentSpec]?
   private var isContentInteractionDisabled = false
   private var contentHeightMarker: UIView?
   private weak var surfaceView: UIView?
@@ -304,6 +306,8 @@ public final class BottomSheetHostingView: UIView {
     hasLaidOut = false
     isPanning = false
     panStartingIndex = nil
+    activeDragRange = nil
+    activeDragDetentSpecs = nil
     setContentInteractionEnabled(true)
     stopObservingContentHeightMarker()
     surfaceView = nil
@@ -348,6 +352,38 @@ public final class BottomSheetHostingView: UIView {
     return (
       minTy: candidates.map { translationY(for: $0) }.min() ?? 0,
       maxTy: candidates.map { translationY(for: $0) }.max() ?? 0
+    )
+  }
+
+  private func snapshotTranslationY(for index: Int, in specs: [DetentSpec]) -> CGFloat {
+    let maxHeight = sheetContainerHeight
+    let snapHeight = specs.indices.contains(index) ? specs[index].height : 0
+    return maxHeight - snapHeight
+  }
+
+  private func snapshotCandidateIndices(including index: Int?, in specs: [DetentSpec]) -> [Int] {
+    var indices = specs.indices.filter { !specs[$0].programmatic }
+    if
+      let index,
+      specs.indices.contains(index),
+      specs[index].programmatic
+    {
+      indices.append(index)
+    }
+    return Array(Set(indices)).sorted {
+      specs[$0].height < specs[$1].height
+    }
+  }
+
+  private func snapshotDraggableRange(
+    including index: Int?,
+    in specs: [DetentSpec]
+  ) -> (minTy: CGFloat, maxTy: CGFloat) {
+    let candidates = snapshotCandidateIndices(including: index, in: specs)
+    guard !candidates.isEmpty else { return (minTy: 0, maxTy: 0) }
+    return (
+      minTy: candidates.map { snapshotTranslationY(for: $0, in: specs) }.min() ?? 0,
+      maxTy: candidates.map { snapshotTranslationY(for: $0, in: specs) }.max() ?? 0
     )
   }
 
@@ -590,6 +626,8 @@ public final class BottomSheetHostingView: UIView {
       isPanning = true
       scrimPinnedFull = false
       panStartingIndex = targetIndex
+      activeDragDetentSpecs = detentSpecs
+      activeDragRange = snapshotDraggableRange(including: targetIndex, in: detentSpecs)
       sheetContainer.endEditing(true)
       setContentInteractionEnabled(false)
       if let handler = surfaceTouchHandler {
@@ -604,7 +642,7 @@ public final class BottomSheetHostingView: UIView {
     case .changed:
       let delta = gesture.translation(in: self).y
       gesture.setTranslation(.zero, in: self)
-      let range = draggableRange(including: panStartingIndex)
+      let range = activeDragRange ?? draggableRange(including: panStartingIndex)
       let minTy = range.minTy
       let maxTy = range.maxTy
       let newTy = max(minTy, min(maxTy, sheetContainer.transform.ty + delta))
@@ -615,8 +653,24 @@ public final class BottomSheetHostingView: UIView {
       isPanning = false
       let velocity = gesture.velocity(in: self).y
       let currentHeight = maxHeight - sheetContainer.transform.ty
-      let index = bestSnapIndex(for: currentHeight, velocity: velocity, including: panStartingIndex)
+      let index =
+        activeDragDetentSpecs.flatMap {
+          $0.count == detentSpecs.count ? $0 : nil
+        }.map {
+          snapshotBestSnapIndex(
+            for: currentHeight,
+            velocity: velocity,
+            including: panStartingIndex,
+            in: $0
+          )
+        } ?? bestSnapIndex(
+          for: currentHeight,
+          velocity: velocity,
+          including: panStartingIndex
+        )
       panStartingIndex = nil
+      activeDragRange = nil
+      activeDragDetentSpecs = nil
       snapToIndex(index, velocity: velocity)
 
     case .cancelled:
@@ -624,17 +678,31 @@ public final class BottomSheetHostingView: UIView {
       setContentInteractionEnabled(true)
       let cancelVelocity = gesture.velocity(in: self).y
       let cancelHeight = maxHeight - sheetContainer.transform.ty
-      let cancelIndex = bestSnapIndex(
-        for: cancelHeight,
-        velocity: cancelVelocity,
-        including: panStartingIndex
-      )
+      let cancelIndex =
+        activeDragDetentSpecs.flatMap {
+          $0.count == detentSpecs.count ? $0 : nil
+        }.map {
+          snapshotBestSnapIndex(
+            for: cancelHeight,
+            velocity: cancelVelocity,
+            including: panStartingIndex,
+            in: $0
+          )
+        } ?? bestSnapIndex(
+          for: cancelHeight,
+          velocity: cancelVelocity,
+          including: panStartingIndex
+        )
       panStartingIndex = nil
+      activeDragRange = nil
+      activeDragDetentSpecs = nil
       snapToIndex(cancelIndex, velocity: cancelVelocity)
 
     case .failed:
       isPanning = false
       panStartingIndex = nil
+      activeDragRange = nil
+      activeDragDetentSpecs = nil
       setContentInteractionEnabled(true)
 
     default:
@@ -663,6 +731,31 @@ public final class BottomSheetHostingView: UIView {
 
     return candidates.min(by: {
       abs(detentSpecs[$0].height - height) < abs(detentSpecs[$1].height - height)
+    }) ?? targetIndex
+  }
+
+  private func snapshotBestSnapIndex(
+    for height: CGFloat,
+    velocity: CGFloat,
+    including index: Int?,
+    in specs: [DetentSpec]
+  ) -> Int {
+    let candidates = snapshotCandidateIndices(including: index, in: specs)
+    guard !candidates.isEmpty else { return targetIndex }
+
+    let flickThreshold: CGFloat = 600
+
+    if velocity < -flickThreshold {
+      return candidates.first(where: { specs[$0].height > height })
+        ?? candidates.last ?? targetIndex
+    }
+    if velocity > flickThreshold {
+      return candidates.last(where: { specs[$0].height < height })
+        ?? candidates.first ?? targetIndex
+    }
+
+    return candidates.min(by: {
+      abs(specs[$0].height - height) < abs(specs[$1].height - height)
     }) ?? targetIndex
   }
 
@@ -796,6 +889,10 @@ public final class BottomSheetHostingView: UIView {
 
   private func refreshDetentsFromLayout() {
     refreshContentHeightMarker()
+    if !isPanning {
+      activeDragRange = nil
+      activeDragDetentSpecs = nil
+    }
     if hasLaidOut, isInvalidContentDetentTarget(targetIndex) {
       updateScrim()
       return
