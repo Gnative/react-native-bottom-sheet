@@ -119,6 +119,22 @@ class BottomSheetViewManager :
     view.setMaxDetentHeight(maxDetentHeight)
   }
 
+  @ReactProp(name = "accessoryMinDetentHeight")
+  override fun setAccessoryMinDetentHeight(
+    view: BottomSheetView,
+    accessoryMinDetentHeight: Double,
+  ) {
+    view.setAccessoryMinDetentHeight(accessoryMinDetentHeight)
+  }
+
+  @ReactProp(name = "accessoryMaxDetentHeight")
+  override fun setAccessoryMaxDetentHeight(
+    view: BottomSheetView,
+    accessoryMaxDetentHeight: Double,
+  ) {
+    view.setAccessoryMaxDetentHeight(accessoryMaxDetentHeight)
+  }
+
   @ReactProp(name = "index")
   override fun setIndex(view: BottomSheetView, index: Int) {
     view.setIndex(index)

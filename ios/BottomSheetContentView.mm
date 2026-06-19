@@ -75,9 +75,19 @@
   [_impl setDetents:raw];
 }
 
+- (void)setAccessoryMinDetentHeight:(CGFloat)accessoryMinDetentHeight
+{
+  _impl.accessoryMinDetentHeight = accessoryMinDetentHeight;
+}
+
 - (void)setMaxDetentHeight:(CGFloat)maxDetentHeight
 {
   _impl.maxDetentHeight = maxDetentHeight;
+}
+
+- (void)setAccessoryMaxDetentHeight:(CGFloat)accessoryMaxDetentHeight
+{
+  _impl.accessoryMaxDetentHeight = accessoryMaxDetentHeight;
 }
 
 - (void)setDetentIndex:(NSInteger)newIndex
@@ -113,6 +123,16 @@
 - (void)unmountChildComponentView:(UIView *)childView
 {
   [_impl unmountChildComponentView:childView];
+}
+
+- (void)mountAccessoryComponentView:(UIView *)accessoryView atIndex:(NSInteger)index
+{
+  [_impl mountAccessoryComponentView:accessoryView atIndex:index];
+}
+
+- (void)unmountAccessoryComponentView:(UIView *)accessoryView
+{
+  [_impl unmountAccessoryComponentView:accessoryView];
 }
 
 - (void)mountSurfaceComponentView:(UIView *)surfaceView atIndex:(NSInteger)index

@@ -1,4 +1,5 @@
 #import "BottomSheetComponentView.h"
+#import "BottomSheetAccessoryComponentView.h"
 #import "BottomSheetContentView.h"
 #import "BottomSheetSurfaceComponentView.h"
 #import "../common/cpp/react/renderer/components/ReactNativeBottomSheetSpec/BottomSheetStateHelper.h"
@@ -102,6 +103,14 @@ using namespace facebook::react;
 
   if (newViewProps.maxDetentHeight != oldViewProps.maxDetentHeight) {
     [_sheetView setMaxDetentHeight:newViewProps.maxDetentHeight];
+  }
+
+  if (newViewProps.accessoryMinDetentHeight != oldViewProps.accessoryMinDetentHeight) {
+    [_sheetView setAccessoryMinDetentHeight:newViewProps.accessoryMinDetentHeight];
+  }
+
+  if (newViewProps.accessoryMaxDetentHeight != oldViewProps.accessoryMaxDetentHeight) {
+    [_sheetView setAccessoryMaxDetentHeight:newViewProps.accessoryMaxDetentHeight];
   }
 
   if (_needsIndexSyncAfterRecycle || newViewProps.index != oldViewProps.index) {
@@ -253,7 +262,9 @@ using namespace facebook::react;
 {
   // Identify the visual surface by component type so the host can own its
   // geometry. Everything else is treated as content.
-  if ([childComponentView isKindOfClass:BottomSheetSurfaceComponentView.class]) {
+  if ([childComponentView isKindOfClass:BottomSheetAccessoryComponentView.class]) {
+    [_sheetView mountAccessoryComponentView:childComponentView atIndex:index];
+  } else if ([childComponentView isKindOfClass:BottomSheetSurfaceComponentView.class]) {
     [_sheetView mountSurfaceComponentView:childComponentView atIndex:index];
   } else {
     [_sheetView mountChildComponentView:childComponentView atIndex:index];
@@ -262,7 +273,9 @@ using namespace facebook::react;
 
 - (void)unmountChildComponentView:(UIView<RCTComponentViewProtocol> *)childComponentView index:(NSInteger)index
 {
-  if ([childComponentView isKindOfClass:BottomSheetSurfaceComponentView.class]) {
+  if ([childComponentView isKindOfClass:BottomSheetAccessoryComponentView.class]) {
+    [_sheetView unmountAccessoryComponentView:childComponentView];
+  } else if ([childComponentView isKindOfClass:BottomSheetSurfaceComponentView.class]) {
     [_sheetView unmountSurfaceComponentView:childComponentView];
   } else {
     [_sheetView unmountChildComponentView:childComponentView];

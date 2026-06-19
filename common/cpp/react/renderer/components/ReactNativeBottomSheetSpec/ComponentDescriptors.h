@@ -23,4 +23,7 @@ class BottomSheetViewComponentDescriptor final
 using BottomSheetSurfaceViewComponentDescriptor =
     ConcreteComponentDescriptor<BottomSheetSurfaceViewShadowNode>;
 
+using BottomSheetAccessoryViewComponentDescriptor =
+    ConcreteComponentDescriptor<BottomSheetAccessoryViewShadowNode>;
+
 } // namespace facebook::react

@@ -111,6 +111,7 @@
     "ios": {
       "componentProvider": {
         "BottomSheetView": "BottomSheetComponentView",
+        "BottomSheetAccessoryView": "BottomSheetAccessoryComponentView",
         "BottomSheetSurfaceView": "BottomSheetSurfaceComponentView"
       }
     },

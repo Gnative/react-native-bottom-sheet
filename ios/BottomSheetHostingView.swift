@@ -61,6 +61,30 @@ public final class BottomSheetHostingView: UIView {
     didSet { refreshDetentsFromLayout() }
   }
 
+  public var accessoryMaxDetentHeight: CGFloat = .nan {
+    didSet {
+      accessoryHost.setMaxDetentHeight(accessoryMaxDetentHeight)
+      accessoryHost.updatePosition(
+        boundsHeight: bounds.height,
+        sheetHeight: currentSheetHeight,
+        resolvedMaxDetentHeight: resolvedMaxDetentHeight,
+        translationY: currentTranslationY
+      )
+    }
+  }
+
+  public var accessoryMinDetentHeight: CGFloat = 0 {
+    didSet {
+      accessoryHost.setMinDetentHeight(accessoryMinDetentHeight)
+      accessoryHost.updatePosition(
+        boundsHeight: bounds.height,
+        sheetHeight: currentSheetHeight,
+        resolvedMaxDetentHeight: resolvedMaxDetentHeight,
+        translationY: currentTranslationY
+      )
+    }
+  }
+
   public var disableScrollableNegotiation: Bool = false
 
   private var rawDetentSpecs: [RawDetentSpec] = []
@@ -96,6 +120,7 @@ public final class BottomSheetHostingView: UIView {
   private weak var surfaceView: UIView?
   private static var markerObservationContext = 0
   private static let springAnimationKey = "bottomSheetSettle"
+  private lazy var accessoryHost = BottomSheetAccessoryHost(owner: self, sheetContainer: sheetContainer)
 
   override public init(frame: CGRect) {
     super.init(frame: frame)
@@ -119,7 +144,7 @@ public final class BottomSheetHostingView: UIView {
     // becomes a sheet drag, handlePan(.began) cancels in-flight RN touches.
     panGesture.delaysTouchesBegan = false
     panGesture.delaysTouchesEnded = false
-    sheetContainer.addGestureRecognizer(panGesture)
+    addGestureRecognizer(panGesture)
   }
 
   @available(*, unavailable)
@@ -168,6 +193,12 @@ public final class BottomSheetHostingView: UIView {
     // how short the content becomes. Sized from the top via frame — never via
     // anchorPoint.
     surfaceView?.frame = sheetContainer.bounds
+    accessoryHost.layout(
+      in: bounds,
+      sheetHeight: currentSheetHeight,
+      resolvedMaxDetentHeight: resolvedMaxDetentHeight,
+      translationY: currentTranslationY
+    )
 
     if !hasLaidOut && !detentSpecs.isEmpty {
       let indexToApply = pendingIndex ?? targetIndex
@@ -200,6 +231,12 @@ public final class BottomSheetHostingView: UIView {
 
     if activeSpring != nil || isPanning { return }
     sheetContainer.transform = CGAffineTransform(translationX: 0, y: translationY(for: targetIndex))
+    accessoryHost.updatePosition(
+      boundsHeight: bounds.height,
+      sheetHeight: currentSheetHeight,
+      resolvedMaxDetentHeight: resolvedMaxDetentHeight,
+      translationY: currentTranslationY
+    )
     updateScrim()
   }
 
@@ -223,11 +260,19 @@ public final class BottomSheetHostingView: UIView {
       return true
     }
 
+    if accessoryHost.presentedFrame?.contains(point) == true {
+      return true
+    }
+
     return isScrimVisible && bounds.contains(point)
   }
 
   override public func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
     guard self.point(inside: point, with: event) else { return nil }
+
+    if let accessoryHit = accessoryHost.hitTest(point, with: event) {
+      return accessoryHit
+    }
 
     if isScrimVisible, !presentedSheetFrame.contains(point) {
       let scrimPoint = convert(point, to: scrimView)
@@ -277,6 +322,18 @@ public final class BottomSheetHostingView: UIView {
     setNeedsLayout()
   }
 
+  public func mountAccessoryComponentView(_ childView: UIView, atIndex _: Int) {
+    accessoryHost.mount(childView)
+    refreshContentHeightMarker()
+    setNeedsLayout()
+  }
+
+  public func unmountAccessoryComponentView(_ childView: UIView) {
+    accessoryHost.unmount(childView)
+    refreshContentHeightMarker()
+    setNeedsLayout()
+  }
+
   public func mountSurfaceComponentView(_ childView: UIView, atIndex index: Int) {
     surfaceView = childView
     sheetContainer.insertSubview(childView, at: index)
@@ -310,6 +367,7 @@ public final class BottomSheetHostingView: UIView {
     activeDragDetentSpecs = nil
     setContentInteractionEnabled(true)
     stopObservingContentHeightMarker()
+    accessoryHost.reset()
     surfaceView = nil
     sheetContainer.transform = .identity
     scrimView.alpha = 0
@@ -329,7 +387,8 @@ public final class BottomSheetHostingView: UIView {
   private func translationY(for index: Int) -> CGFloat {
     let maxHeight = sheetContainerHeight
     let snapHeight = detent(at: index).height
-    return maxHeight - snapHeight
+    let hiddenAccessoryOffset = snapHeight == 0 ? accessoryHost.currentHeight(fitting: bounds) : 0
+    return maxHeight - snapHeight + hiddenAccessoryOffset
   }
 
   private func snapCandidateIndices(including index: Int? = nil) -> [Int] {
@@ -428,7 +487,13 @@ public final class BottomSheetHostingView: UIView {
   private func emitPosition(overrideTy: CGFloat? = nil) {
     let maxHeight = sheetContainerHeight
     let ty = overrideTy ?? currentTranslationY
-    let position = maxHeight - ty
+    let position = max(0, maxHeight - ty)
+    accessoryHost.updatePosition(
+      boundsHeight: bounds.height,
+      sheetHeight: position,
+      resolvedMaxDetentHeight: resolvedMaxDetentHeight,
+      translationY: ty
+    )
     updateScrim(forPosition: position)
     updateSheetVisibility(forPosition: position)
     updateInteractionState()
@@ -1073,6 +1138,12 @@ extension BottomSheetHostingView: CAAnimationDelegate {
 }
 
 extension BottomSheetHostingView: UIGestureRecognizerDelegate {
+  public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+    guard gestureRecognizer === panGesture else { return true }
+    let touchLocation = touch.location(in: self)
+    return presentedSheetFrame.contains(touchLocation)
+  }
+
   public func gestureRecognizer(
     _ gestureRecognizer: UIGestureRecognizer,
     shouldBeRequiredToFailBy other: UIGestureRecognizer

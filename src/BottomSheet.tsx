@@ -9,6 +9,7 @@ import {
 import BottomSheetNativeView, {
   type NativeProps,
 } from './BottomSheetNativeComponent';
+import BottomSheetAccessoryNativeComponent from './BottomSheetAccessoryNativeComponent';
 import BottomSheetSurfaceNativeComponent from './BottomSheetSurfaceNativeComponent';
 import { Portal } from './BottomSheetProvider';
 import { type Detent } from './bottomSheetUtils';
@@ -50,6 +51,21 @@ export interface BottomSheetProps {
    * content would collapse and not show.
    */
   surface?: ReactNode;
+  /**
+   * Optional view rendered as an accessory attached to the sheet's top edge.
+   * It moves with the sheet as part of the native animation path, but is laid
+   * out separately so it can sit above the sheet itself.
+   */
+  accessory?: ReactNode;
+  /**
+   * Minimum clamped position for the accessory view.
+   */
+  accessoryMinDetent?: number;
+  /**
+   * Maximum clamped position for the accessory view.
+   */
+  accessoryMaxDetent?: number;
+
   /** Additional style applied to the native sheet host view. */
   style?: StyleProp<ViewStyle>;
   /**
@@ -150,6 +166,9 @@ export const BottomSheet = (props: BottomSheetProps) => {
   const {
     children,
     surface,
+    accessory,
+    accessoryMinDetent,
+    accessoryMaxDetent,
     style,
     detents = [0, 'content'],
     index,
@@ -191,6 +210,14 @@ export const BottomSheet = (props: BottomSheetProps) => {
   });
 
   const clampedIndex = Math.max(0, Math.min(index, nativeDetents.length - 1));
+  const resolvedAccessoryMinDetentHeight =
+    accessoryMinDetent == null
+      ? undefined
+      : Math.max(0, Math.min(accessoryMinDetent, maxHeight));
+  const resolvedAccessoryMaxDetentHeight =
+    accessoryMaxDetent == null
+      ? undefined
+      : Math.max(0, Math.min(accessoryMaxDetent, maxHeight));
   const selectedDetentValue = detents[clampedIndex]
     ? resolveDetentValue(detents[clampedIndex])
     : 0;
@@ -245,7 +272,9 @@ export const BottomSheet = (props: BottomSheetProps) => {
             style,
           ]}
           detents={nativeDetents}
+          accessoryMinDetentHeight={resolvedAccessoryMinDetentHeight}
           maxDetentHeight={maxHeight}
+          accessoryMaxDetentHeight={resolvedAccessoryMaxDetentHeight}
           index={index}
           animateIn={animateIn}
           animateContentHeight={animateContentHeight}
@@ -258,6 +287,20 @@ export const BottomSheet = (props: BottomSheetProps) => {
           onSettle={handleSettle}
           onPositionChange={onPositionChange}
         >
+          {accessory != null && (
+            <BottomSheetAccessoryNativeComponent
+              collapsable={false}
+              pointerEvents="box-none"
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: 0,
+              }}
+            >
+              {accessory}
+            </BottomSheetAccessoryNativeComponent>
+          )}
           {surface != null && (
             <BottomSheetSurfaceNativeComponent
               collapsable={false}

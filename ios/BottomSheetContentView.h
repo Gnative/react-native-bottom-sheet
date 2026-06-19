@@ -24,13 +24,17 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, readonly) BOOL isModalAccessibilityActive;
 
 - (void)setDetents:(NSArray<NSDictionary *> *)raw;
+- (void)setAccessoryMinDetentHeight:(CGFloat)accessoryMinDetentHeight;
 - (void)setMaxDetentHeight:(CGFloat)maxDetentHeight;
+- (void)setAccessoryMaxDetentHeight:(CGFloat)accessoryMaxDetentHeight;
 - (void)setDetentIndex:(NSInteger)newIndex;
 - (void)setScrimColor:(UIColor *_Nullable)color;
 - (void)setScrimOpacities:(NSArray<NSNumber *> *)opacities;
 - (CGFloat)currentContentOffsetY;
 - (void)mountChildComponentView:(UIView *)childView atIndex:(NSInteger)index;
 - (void)unmountChildComponentView:(UIView *)childView;
+- (void)mountAccessoryComponentView:(UIView *)accessoryView atIndex:(NSInteger)index;
+- (void)unmountAccessoryComponentView:(UIView *)accessoryView;
 - (void)mountSurfaceComponentView:(UIView *)surfaceView atIndex:(NSInteger)index;
 - (void)unmountSurfaceComponentView:(UIView *)surfaceView;
 - (void)resetSheetState;

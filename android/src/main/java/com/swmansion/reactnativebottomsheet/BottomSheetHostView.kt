@@ -101,6 +101,17 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   private var maxDetentHeight = Float.NaN
   private var contentHeightMarker: View? = null
   private var surfaceView: View? = null
+  private val sheetChildren = mutableListOf<View>()
+  private val accessoryHost =
+    BottomSheetAccessoryHost(
+      this,
+      sheetContainer,
+      ::attachAccessoryViewToHost,
+      ::detachAccessoryViewFromHost,
+    ) {
+      requestLayout()
+      invalidate()
+    }
 
   private val contentHeightMarkerLayoutListener =
     View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> refreshDetentsFromLayout() }
@@ -122,18 +133,29 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   }
 
   val sheetChildCount: Int
-    get() = sheetContainer.childCount
+    get() = sheetChildren.size
 
-  fun getSheetChildAt(index: Int): View? = sheetContainer.getChildAt(index)
+  fun getSheetChildAt(index: Int): View? = sheetChildren.getOrNull(index)
 
   fun addSheetChild(child: View, index: Int) {
-    sheetContainer.addView(child, index)
-    refreshContentHeightMarker()
+    val insertionIndex = index.coerceIn(0, sheetChildren.size)
+    sheetChildren.add(insertionIndex, child)
+    if (child is BottomSheetAccessoryView) {
+      accessoryHost.mount(child)
+    } else {
+      sheetContainer.addView(child, sheetContainer.childCount)
+    }
+    refreshManagedChildren()
   }
 
   fun removeSheetChildAt(index: Int) {
-    sheetContainer.removeViewAt(index)
-    refreshContentHeightMarker()
+    val child = sheetChildren.removeAt(index)
+    if (child is BottomSheetAccessoryView) {
+      accessoryHost.unmount(child)
+    } else {
+      sheetContainer.removeView(child)
+    }
+    refreshManagedChildren()
   }
 
   // MARK: - Child view management
@@ -142,7 +164,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     if (child === sheetContainer) {
       super.addView(child, index, params)
     } else {
-      sheetContainer.addView(child, index, params)
+      addSheetChild(child, index)
     }
   }
 
@@ -150,14 +172,15 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     if (view === sheetContainer) {
       super.removeView(view)
     } else {
-      sheetContainer.removeView(view)
-      refreshContentHeightMarker()
+      val childIndex = sheetChildren.indexOf(view)
+      if (childIndex >= 0) {
+        removeSheetChildAt(childIndex)
+      }
     }
   }
 
   override fun removeViewAt(index: Int) {
-    sheetContainer.removeViewAt(index)
-    refreshContentHeightMarker()
+    removeSheetChildAt(index)
   }
 
   // MARK: - Layout
@@ -171,6 +194,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     refreshContentHeightMarker()
     refreshDetentsFromLayout()
     layoutSheetContainer(w, h)
+    accessoryHost.layout(w, h.toFloat(), sheetContainer.translationY, resolvedMaxDetentHeight(h))
 
     if (!hasLaidOut && detentSpecs.isNotEmpty()) {
       val indexToApply = pendingIndex ?: targetIndex
@@ -203,6 +227,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
 
     if (activeAnimation != null || isPanning) return
     sheetContainer.translationY = translationY(targetIndex)
+    accessoryHost.updatePosition(height.toFloat(), sheetContainer.translationY, resolvedMaxDetentHeight())
     updateShadowState(sheetContainer.translationY)
   }
 
@@ -275,6 +300,16 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   fun setMaxDetentHeight(maxDetentHeight: Double) {
     this.maxDetentHeight = (maxDetentHeight * density).toFloat()
     refreshDetentsFromLayout()
+  }
+
+  fun setAccessoryMaxDetentHeight(accessoryMaxDetentHeight: Double) {
+    accessoryHost.setMaxDetentHeight((accessoryMaxDetentHeight * density).toFloat())
+    accessoryHost.updatePosition(height.toFloat(), sheetContainer.translationY, resolvedMaxDetentHeight())
+  }
+
+  fun setAccessoryMinDetentHeight(accessoryMinDetentHeight: Double) {
+    accessoryHost.setMinDetentHeight((accessoryMinDetentHeight * density).toFloat())
+    accessoryHost.updatePosition(height.toFloat(), sheetContainer.translationY, resolvedMaxDetentHeight())
   }
 
   // Stable coordinate base for the sheet container. The container is sized to
@@ -462,7 +497,8 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   private fun translationY(index: Int): Float {
     val maxHeight = resolvedMaxDetentHeight()
     val snapHeight = detentSpecs.getOrNull(index)?.height ?: 0f
-    return maxHeight - snapHeight
+    val hiddenAccessoryOffset = if (snapHeight == 0f) accessoryHost.currentHeight() else 0f
+    return maxHeight - snapHeight + hiddenAccessoryOffset
   }
 
   private val minDetentTranslationY: Float
@@ -534,11 +570,12 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   private fun emitPosition() {
     val maxHeight = resolvedMaxDetentHeight()
     val ty = sheetContainer.translationY
-    val position = maxHeight - ty
+    val position = (maxHeight - ty).coerceAtLeast(0f)
     updateScrim(position)
     updateSheetVisibility(position)
     updateInteractionState()
     listener?.onPositionChange((position / density).toDouble(), detentIndexAt(position).toDouble())
+    accessoryHost.updatePosition(height.toFloat(), ty, maxHeight)
     updateShadowState(ty)
   }
 
@@ -688,6 +725,13 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
     val sheetTop = sheetContainer.top + sheetContainer.translationY
     if (event.actionMasked == MotionEvent.ACTION_DOWN && event.y < sheetTop) {
+      if (accessoryHost.isTouchOnAccessoryBand(event.y, sheetTop)) {
+        initialTouchX = event.x
+        initialTouchY = event.y
+        lastTouchY = event.y
+        activePointerId = event.getPointerId(0)
+        return false
+      }
       if (isScrimVisible()) {
         initialTouchX = event.x
         initialTouchY = event.y
@@ -980,9 +1024,11 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     activeAnimation = null
     velocityTracker?.recycle()
     velocityTracker = null
+    accessoryHost.reset()
     contentHeightMarker?.removeOnLayoutChangeListener(contentHeightMarkerLayoutListener)
     contentHeightMarker = null
     surfaceView = null
+    sheetChildren.clear()
     rawDetentSpecs = emptyList()
     detentSpecs = emptyList()
     targetIndex = 0
@@ -1004,6 +1050,24 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     sheetContainer.removeAllViews()
     stateWrapper = null
     lastShadowOffsetY = Float.NaN
+  }
+
+  private fun refreshManagedChildren() {
+    refreshContentHeightMarker()
+    requestLayout()
+    invalidate()
+  }
+
+  private fun attachAccessoryViewToHost(child: View) {
+    super.addView(
+      child,
+      0,
+      LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
+    )
+  }
+
+  private fun detachAccessoryViewFromHost(child: View) {
+    super.removeView(child)
   }
 
   private fun updateScrim(position: Float = currentSheetHeight()) {

@@ -24,6 +24,13 @@ class JSI_EXPORT BottomSheetViewShadowNode final
 };
 
 JSI_EXPORT extern const char BottomSheetSurfaceViewComponentName[];
+JSI_EXPORT extern const char BottomSheetAccessoryViewComponentName[];
+
+using BottomSheetAccessoryViewShadowNode = ConcreteViewShadowNode<
+    BottomSheetAccessoryViewComponentName,
+    BottomSheetAccessoryViewProps,
+    BottomSheetAccessoryViewEventEmitter,
+    StateData>;
 
 // The surface needs no custom shadow-node behavior, so this mirrors the codegen
 // alias exactly (state is the default StateData). It only lives here because the

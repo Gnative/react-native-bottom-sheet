@@ -136,6 +136,12 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
 
   fun setMaxDetentHeight(maxDetentHeight: Double) = host.setMaxDetentHeight(maxDetentHeight)
 
+  fun setAccessoryMinDetentHeight(accessoryMinDetentHeight: Double) =
+    host.setAccessoryMinDetentHeight(accessoryMinDetentHeight)
+
+  fun setAccessoryMaxDetentHeight(accessoryMaxDetentHeight: Double) =
+    host.setAccessoryMaxDetentHeight(accessoryMaxDetentHeight)
+
   fun setNativeOverlay(value: Boolean) {
     if (value == nativeOverlay) return
     nativeOverlay = value
