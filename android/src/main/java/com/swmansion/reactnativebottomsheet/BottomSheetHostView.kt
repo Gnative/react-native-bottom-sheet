@@ -487,7 +487,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     val contentView =
       (0 until sheetContainer.childCount)
         .map { sheetContainer.getChildAt(it) }
-        .firstOrNull { it !== surfaceView } as? ViewGroup ?: return null
+        .firstOrNull { it !== surfaceView && !accessoryHost.contains(it) } as? ViewGroup ?: return null
     if (contentView.childCount == 0) return null
     return contentView.getChildAt(contentView.childCount - 1)
   }
@@ -497,7 +497,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   private fun translationY(index: Int): Float {
     val maxHeight = resolvedMaxDetentHeight()
     val snapHeight = detentSpecs.getOrNull(index)?.height ?: 0f
-    val hiddenAccessoryOffset = if (snapHeight == 0f) accessoryHost.currentHeight() else 0f
+    val hiddenAccessoryOffset = if (snapHeight == 0f) accessoryHost.closedDetentOffset() else 0f
     return maxHeight - snapHeight + hiddenAccessoryOffset
   }
 
@@ -541,7 +541,8 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   private fun snapshotTranslationY(index: Int, specs: List<DetentSpec>): Float {
     val maxHeight = resolvedMaxDetentHeight()
     val snapHeight = specs.getOrNull(index)?.height ?: 0f
-    return maxHeight - snapHeight
+    val hiddenAccessoryOffset = if (snapHeight == 0f) accessoryHost.closedDetentOffset() else 0f
+    return maxHeight - snapHeight + hiddenAccessoryOffset
   }
 
   private fun snapshotCandidateIndices(includeIndex: Int?, specs: List<DetentSpec>): List<Int> {
@@ -587,7 +588,9 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     interpolateAtPosition(position, detentSpecs.indices.map { it.toFloat() })
 
   private fun updateSheetVisibility(position: Float) {
-    sheetContainer.alpha = if (position <= 0.5f) 0f else 1f
+    val shouldHideSheetContainer =
+      position <= 0.5f && !accessoryHost.keepsContainerVisibleWhenClosed()
+    sheetContainer.alpha = if (shouldHideSheetContainer) 0f else 1f
   }
 
   private var lastShadowOffsetY = Float.NaN
@@ -1059,7 +1062,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   }
 
   private fun attachAccessoryViewToHost(child: View) {
-    super.addView(
+    sheetContainer.addView(
       child,
       0,
       LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
@@ -1067,7 +1070,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   }
 
   private fun detachAccessoryViewFromHost(child: View) {
-    super.removeView(child)
+    sheetContainer.removeView(child)
   }
 
   private fun updateScrim(position: Float = currentSheetHeight()) {

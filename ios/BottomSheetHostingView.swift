@@ -270,13 +270,15 @@ public final class BottomSheetHostingView: UIView {
   override public func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
     guard self.point(inside: point, with: event) else { return nil }
 
-    if let accessoryHit = accessoryHost.hitTest(point, with: event) {
-      return accessoryHit
-    }
-
-    if isScrimVisible, !presentedSheetFrame.contains(point) {
-      let scrimPoint = convert(point, to: scrimView)
-      return scrimView.hitTest(scrimPoint, with: event)
+    if !presentedSheetFrame.contains(point) {
+      if let accessoryHit = accessoryHost.hitTest(point, with: event) {
+        return accessoryHit
+      }
+      if isScrimVisible {
+        let scrimPoint = convert(point, to: scrimView)
+        return scrimView.hitTest(scrimPoint, with: event)
+      }
+      return nil
     }
 
     let containerPoint = convert(point, to: sheetContainer)
@@ -387,7 +389,7 @@ public final class BottomSheetHostingView: UIView {
   private func translationY(for index: Int) -> CGFloat {
     let maxHeight = sheetContainerHeight
     let snapHeight = detent(at: index).height
-    let hiddenAccessoryOffset = snapHeight == 0 ? accessoryHost.currentHeight(fitting: bounds) : 0
+    let hiddenAccessoryOffset = snapHeight == 0 ? accessoryHost.closedDetentOffset(fitting: bounds) : 0
     return maxHeight - snapHeight + hiddenAccessoryOffset
   }
 
@@ -417,7 +419,8 @@ public final class BottomSheetHostingView: UIView {
   private func snapshotTranslationY(for index: Int, in specs: [DetentSpec]) -> CGFloat {
     let maxHeight = sheetContainerHeight
     let snapHeight = specs.indices.contains(index) ? specs[index].height : 0
-    return maxHeight - snapHeight
+    let hiddenAccessoryOffset = snapHeight == 0 ? accessoryHost.closedDetentOffset(fitting: bounds) : 0
+    return maxHeight - snapHeight + hiddenAccessoryOffset
   }
 
   private func snapshotCandidateIndices(including index: Int?, in specs: [DetentSpec]) -> [Int] {
@@ -605,23 +608,6 @@ public final class BottomSheetHostingView: UIView {
       duration: duration
     )
 
-    // The sheet is animated on the render server from samples of the same spring
-    // that feeds the follower position events.
-    let animation = CAKeyframeAnimation(keyPath: "transform.translation.y")
-    let sampleCount = max(Int((duration * 120).rounded()), 1)
-    animation.values = spring.keyframeValues(count: sampleCount)
-    animation.keyTimes = (0 ... sampleCount).map {
-      NSNumber(value: Double($0) / Double(sampleCount))
-    }
-    animation.duration = duration
-    animation.calculationMode = .linear
-    animation.beginTime = sheetContainer.layer.convertTime(startTime, from: nil)
-    animation.isRemovedOnCompletion = false
-    animation.fillMode = .forwards
-    animation.delegate = self
-
-    sheetContainer.transform = CGAffineTransform(translationX: 0, y: targetTy)
-    sheetContainer.layer.add(animation, forKey: Self.springAnimationKey)
     activeSpring = spring
 
     startDisplayLink()
@@ -648,7 +634,12 @@ public final class BottomSheetHostingView: UIView {
 
   private func stepSpring(targetTime: CFTimeInterval) {
     guard let spring = activeSpring else { return }
-    emitPosition(overrideTy: spring.value(at: targetTime))
+    let ty = spring.value(at: targetTime)
+    sheetContainer.transform = CGAffineTransform(translationX: 0, y: ty)
+    emitPosition(overrideTy: ty)
+    if targetTime >= spring.startTime + spring.duration {
+      finishSpring()
+    }
   }
 
   private func finishSpring() {
@@ -1100,7 +1091,10 @@ public final class BottomSheetHostingView: UIView {
   private func findContentHeightMarker() -> UIView? {
     // The surface is a sibling of the content wrapper; skip it so the marker is
     // always read from the content, never from the surface.
-    guard let contentView = sheetContainer.subviews.first(where: { $0 !== surfaceView })
+    guard
+      let contentView = sheetContainer.subviews.first(where: {
+        $0 !== surfaceView && !accessoryHost.contains($0)
+      })
     else { return nil }
     return contentView.subviews.last
   }
@@ -1162,17 +1156,6 @@ extension BottomSheetHostingView: UIGestureRecognizerDelegate {
 
 private extension BottomSheetHostingView {
   var currentTranslationY: CGFloat {
-    // During a settle the modal is driven by a keyframe animation on the render
-    // server (the model `transform` already holds the final target), so read the
-    // analytical spring the keyframes were sampled from. The presentation layer
-    // is deliberately not used: right after a snap starts it still holds the
-    // previously committed transform, and that stale value (e.g. the identity
-    // transform from before the first layout) reads as a wide-open sheet — which
-    // briefly flashed the scrim on mount. A drag assigns `transform` directly,
-    // so outside a settle the model value is correct.
-    if let spring = activeSpring {
-      return spring.value(at: CACurrentMediaTime())
-    }
     return sheetContainer.transform.ty
   }
 
@@ -1183,7 +1166,8 @@ private extension BottomSheetHostingView {
   }
 
   func updateSheetVisibility(forPosition position: CGFloat) {
-    sheetContainer.alpha = position <= 0.5 ? 0 : 1
+    let shouldHideSheetContainer = position <= 0.5 && !accessoryHost.keepsContainerVisibleWhenClosed
+    sheetContainer.alpha = shouldHideSheetContainer ? 0 : 1
   }
 
   func updateScrim(forPosition position: CGFloat) {

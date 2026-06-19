@@ -20,7 +20,6 @@ const SheetAccessory = () => {
       pointerEvents="box-none"
       style={{
         paddingHorizontal: 16,
-        alignItems: 'center',
         flexDirection: 'row',
         alignItems: 'flex-end',
         gap: 10,
@@ -90,11 +89,17 @@ export const AccessoryViewScreen = () => {
           index={index}
           accessory={<SheetAccessory />}
           accessoryMaxDetent={ACCESSORY_MAX_DETENT}
-          accessoryMinDetent={insets.bottom + 20}
+          accessoryMinDetent={insets.bottom + 100}
           onIndexChange={setIndex}
           surface={<SheetBackground style={StyleSheet.absoluteFill} />}
         >
-          <SheetHeader title="Accessory view" onClose={() => setIndex(0)} />
+          <SheetHeader
+            title="Accessory view"
+            onClose={() => {
+              console.log('<SheetHeader');
+              setIndex(0);
+            }}
+          />
           <View
             style={{
               height: SECTION_HEIGHT,

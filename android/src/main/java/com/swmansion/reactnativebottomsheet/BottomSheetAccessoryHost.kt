@@ -62,12 +62,12 @@ internal class BottomSheetAccessoryHost(
     accessory.translationY =
       if (accessoryMinDetentHeight > 0f) {
         val flooredSheetHeight = cappedSheetHeight.coerceAtLeast(accessoryMinDetentHeight)
-        viewHeight - flooredSheetHeight - accessoryHeight
+        sheetHeight - flooredSheetHeight - accessoryHeight
       } else {
         when {
-          cappedSheetHeight <= 0f -> viewHeight
-          cappedSheetHeight < accessoryHeight -> viewHeight - cappedSheetHeight
-          else -> viewHeight - cappedSheetHeight - accessoryHeight
+          cappedSheetHeight <= 0f -> sheetHeight
+          cappedSheetHeight < accessoryHeight -> sheetHeight - cappedSheetHeight
+          else -> sheetHeight - cappedSheetHeight - accessoryHeight
         }
       }
   }
@@ -76,7 +76,7 @@ internal class BottomSheetAccessoryHost(
     val accessoryBottom =
       accessoryView
         ?.takeIf { it.visibility == View.VISIBLE }
-        ?.let { it.translationY + it.height }
+        ?.let { sheetTop + it.translationY + it.height }
         ?: sheetTop
     return y < sheetTop && y >= accessoryBottom
   }
@@ -92,6 +92,18 @@ internal class BottomSheetAccessoryHost(
   fun currentHeight(): Float {
     val accessory = accessoryView ?: return 0f
     return accessoryHeight(accessory)
+  }
+
+  fun contains(view: View): Boolean = accessoryView === view
+
+  fun keepsContainerVisibleWhenClosed(): Boolean =
+    accessoryMinDetentHeight > 0f && accessoryView != null
+
+  fun closedDetentOffset(): Float {
+    if (accessoryMinDetentHeight > 0f) {
+      return 0f
+    }
+    return currentHeight()
   }
 
   private fun resolvedAccessoryMaxDetentHeight(resolvedMaxDetentHeight: Float): Float? {

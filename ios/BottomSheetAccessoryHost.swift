@@ -16,8 +16,16 @@ final class BottomSheetAccessoryHost: NSObject {
   }
 
   var presentedFrame: CGRect? {
-    guard let accessoryView, !accessoryView.isHidden, accessoryView.alpha > 0.01 else { return nil }
-    return accessoryView.frame
+    guard
+      let accessoryView,
+      let owner,
+      let container = accessoryView.superview,
+      !accessoryView.isHidden,
+      accessoryView.alpha > 0.01
+    else {
+      return nil
+    }
+    return owner.convert(accessoryView.frame, from: container)
   }
 
   func setMinDetentHeight(_ minDetentHeight: CGFloat) {
@@ -30,8 +38,8 @@ final class BottomSheetAccessoryHost: NSObject {
 
   func mount(_ accessoryView: UIView) {
     self.accessoryView = accessoryView
-    if let owner, let sheetContainer {
-      owner.insertSubview(accessoryView, belowSubview: sheetContainer)
+    if let sheetContainer {
+      sheetContainer.insertSubview(accessoryView, at: 0)
     }
     refreshObservation()
     owner?.setNeedsLayout()
@@ -80,16 +88,16 @@ final class BottomSheetAccessoryHost: NSObject {
 
     if minDetentHeight > 0 {
       let flooredSheetHeight = max(cappedSheetHeight, minDetentHeight)
-      accessoryView.frame.origin.y = boundsHeight - flooredSheetHeight - accessoryHeight
+      accessoryView.frame.origin.y = sheetHeight - flooredSheetHeight - accessoryHeight
       return
     }
 
     if cappedSheetHeight <= 0 {
-      accessoryView.frame.origin.y = boundsHeight
+      accessoryView.frame.origin.y = sheetHeight
     } else if cappedSheetHeight < accessoryHeight {
-      accessoryView.frame.origin.y = boundsHeight - cappedSheetHeight
+      accessoryView.frame.origin.y = sheetHeight - cappedSheetHeight
     } else {
-      accessoryView.frame.origin.y = boundsHeight - cappedSheetHeight - accessoryHeight
+      accessoryView.frame.origin.y = sheetHeight - cappedSheetHeight - accessoryHeight
     }
   }
 
@@ -117,6 +125,21 @@ final class BottomSheetAccessoryHost: NSObject {
   func currentHeight(fitting bounds: CGRect) -> CGFloat {
     guard let accessoryView else { return 0 }
     return max(accessoryView.bounds.height, accessoryView.sizeThatFits(bounds.size).height)
+  }
+
+  func contains(_ view: UIView) -> Bool {
+    accessoryView === view
+  }
+
+  var keepsContainerVisibleWhenClosed: Bool {
+    minDetentHeight > 0 && accessoryView != nil
+  }
+
+  func closedDetentOffset(fitting bounds: CGRect) -> CGFloat {
+    if minDetentHeight > 0 {
+      return 0
+    }
+    return currentHeight(fitting: bounds)
   }
 
   private func resolvedAccessoryMaxDetentHeight(_ resolvedMaxDetentHeight: CGFloat) -> CGFloat? {
