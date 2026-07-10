@@ -1,6 +1,6 @@
 {
-  "name": "@swmansion/react-native-bottom-sheet",
-  "version": "0.16.2-next.1",
+  "name": "@gnative/react-native-bottom-sheet",
+  "version": "0.16.2-contours.1",
   "description": "Provides bottom-sheet components for React Native.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
@@ -35,9 +35,12 @@
   "scripts": {
     "example": "bun run --filter @swmansion/react-native-bottom-sheet-example",
     "clean": "del-cli lib",
-    "prepare": "lefthook install && bob build",
+    "prepare": "bob build",
+    "hooks:install": "lefthook install",
     "typecheck": "tsc",
-    "lint": "eslint \"**/*.{js,ts,tsx}\""
+    "lint": "eslint \"**/*.{js,ts,tsx}\"",
+    "build": "bob build",
+    "prepack": "bob build"
   },
   "keywords": [
     "react-native",
@@ -55,7 +58,7 @@
   },
   "homepage": "https://github.com/software-mansion-labs/react-native-bottom-sheet",
   "publishConfig": {
-    "registry": "https://registry.npmjs.org"
+    "registry": "https://npm.pkg.github.com"
   },
   "devDependencies": {
     "@eslint/compat": "2.1.0",
