@@ -94,15 +94,25 @@ using namespace facebook::react;
   {
     NSMutableArray<NSDictionary *> *detentsArray = [NSMutableArray new];
     for (const auto &detent : newViewProps.detents) {
+      NSString *kind =
+          detent.kind == "content" ? @"content" : detent.kind == "fullscreen" ? @"fullscreen" : @"points";
       [detentsArray addObject:@{
         @"value": @(detent.value),
-        @"kind": detent.kind == "content" ? @"content" : @"points",
+        @"kind": kind,
         @"programmatic": @(detent.programmatic),
       }];
     }
     [_sheetView setDetents:detentsArray];
   }
 
+
+  if (newViewProps.safeAreaTopInset != oldViewProps.safeAreaTopInset) {
+    [_sheetView setSafeAreaTopInset:newViewProps.safeAreaTopInset];
+  }
+
+  if (newViewProps.fullscreenTopOffset != oldViewProps.fullscreenTopOffset) {
+    [_sheetView setFullscreenTopOffset:newViewProps.fullscreenTopOffset];
+  }
 
   if (_needsIndexSyncAfterRecycle || newViewProps.index != oldViewProps.index) {
     [_sheetView setDetentIndex:newViewProps.index];

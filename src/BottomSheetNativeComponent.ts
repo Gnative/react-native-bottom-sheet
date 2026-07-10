@@ -13,6 +13,8 @@ type NativeDetent = Readonly<{
 
 export interface NativeProps extends ViewProps {
   detents: ReadonlyArray<NativeDetent>;
+  safeAreaTopInset: CodegenTypes.Double;
+  fullscreenTopOffset: CodegenTypes.Double;
   index: CodegenTypes.Int32;
   animateIn?: CodegenTypes.WithDefault<boolean, true>;
   animateContentHeight?: CodegenTypes.WithDefault<boolean, true>;

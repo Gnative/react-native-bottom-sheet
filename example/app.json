@@ -3,6 +3,7 @@
     "name": "React Native Bottom Sheet Example",
     "slug": "@swmansion/react-native-bottom-sheet-example",
     "version": "0.16.2-next.1",
+    "scheme": "react-native-bottom-sheet-example",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

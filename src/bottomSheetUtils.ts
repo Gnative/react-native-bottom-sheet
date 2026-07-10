@@ -1,5 +1,5 @@
-/** A detent value in points, or `'content'` to size to the measured content height. */
-export type DetentValue = number | 'content';
+/** A detent value in points, `'content'`, or `'fullscreen'`. */
+export type DetentValue = number | 'content' | 'fullscreen';
 
 /** A draggable detent or an object form that can mark a detent as programmatic-only. */
 export type Detent =
@@ -74,6 +74,9 @@ export const resolveDetent = (
   if (typeof detentValueInput === 'number') return detentValueInput;
   if (detentValueInput === 'content') {
     return contentHeight > 0 ? Math.min(contentHeight, maxHeight) : maxHeight;
+  }
+  if (detentValueInput === 'fullscreen') {
+    return maxHeight;
   }
   throw new Error(`Invalid detent: \`${detentValueInput}\`.`);
 };

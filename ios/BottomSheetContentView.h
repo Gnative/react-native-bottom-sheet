@@ -34,6 +34,8 @@ NS_ASSUME_NONNULL_BEGIN
 // The natively measured inset of the content region: the gap between the
 // sheet's height and the detent cap.
 - (CGFloat)contentRegionInset;
+- (void)setSafeAreaTopInset:(CGFloat)safeAreaTopInset;
+- (void)setFullscreenTopOffset:(CGFloat)fullscreenTopOffset;
 - (void)setDetentIndex:(NSInteger)newIndex;
 - (void)setScrimColor:(UIColor *_Nullable)color;
 - (void)setScrimOpacities:(NSArray<NSNumber *> *)opacities;

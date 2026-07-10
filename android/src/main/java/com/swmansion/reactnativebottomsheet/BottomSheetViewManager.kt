@@ -114,6 +114,15 @@ class BottomSheetViewManager :
     view.setDetents(list)
   }
 
+  @ReactProp(name = "safeAreaTopInset")
+  override fun setSafeAreaTopInset(view: BottomSheetView, safeAreaTopInset: Double) {
+    view.setSafeAreaTopInset(safeAreaTopInset)
+  }
+
+  @ReactProp(name = "fullscreenTopOffset")
+  override fun setFullscreenTopOffset(view: BottomSheetView, fullscreenTopOffset: Double) {
+    view.setFullscreenTopOffset(fullscreenTopOffset)
+  }
   @ReactProp(name = "index")
   override fun setIndex(view: BottomSheetView, index: Int) {
     view.setIndex(index)

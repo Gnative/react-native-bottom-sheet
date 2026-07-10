@@ -72,8 +72,8 @@ export const SheetHeader = ({
   title: string;
   onClose: () => void;
 }) => (
-  <View>
-    <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 4 }}>
+  <View style={{ borderWidth: 1 }}>
+    <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 4, backgroundColor:'pink' }}>
       <View
         style={{
           width: 36,

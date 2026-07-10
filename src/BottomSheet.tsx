@@ -1,6 +1,7 @@
 import { useState, type ComponentType, type ReactNode } from 'react';
 import type { NativeSyntheticEvent, StyleProp, ViewStyle } from 'react-native';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import BottomSheetNativeView, {
   type NativeProps,
@@ -50,9 +51,10 @@ export interface BottomSheetProps {
   style?: StyleProp<ViewStyle>;
   /**
    * Snap points for the sheet, in ascending order by height. Defaults to
-   * `[0, 'content']`. Fixed detents may be taller than the measured content
-   * height, so `[0, 'content', 600]` is valid when the content is shorter than
-   * 600pt.
+   * `[0, 'content']`. Use `'fullscreen'` for a detent that stops at
+   * `fullscreenTopOffset` from the top. Fixed detents may be taller than the
+   * measured content height, so `[0, 'content', 600]` is valid when the
+   * content is shorter than 600pt.
    */
   detents?: Detent[];
   /** Zero-based index into `detents`. */
@@ -71,6 +73,14 @@ export interface BottomSheetProps {
    * detents. Defaults to `false`, so detents remain capped below the status bar.
    */
   extendUnderStatusBar?: boolean;
+  /**
+   * Top offset, in points, used by the `'fullscreen'` detent. The sheet's top
+   * edge stops this far from the top of the host container instead of at the
+   * safe-area top inset.
+   *
+   * @default 22
+   */
+  fullscreenTopOffset?: number;
   /**
    * Called when a user-driven snap is initiated: the moment a drag commits to a
    * detent, before the animation settles. Does not fire for programmatic `index`
@@ -152,6 +162,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
     animateIn = true,
     animateContentHeight = true,
     extendUnderStatusBar = false,
+    fullscreenTopOffset = 22,
     onIndexChange,
     onSettle,
     onPositionChange,
@@ -171,6 +182,8 @@ export const BottomSheet = (props: BottomSheetProps) => {
   // only size the native-overlay host for the first frame, before the overlay
   // window reports its measured geometry.
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const resolvedFullscreenTopOffset = Math.max(0, fullscreenTopOffset);
   const nativeDetents = detents.map((detent) => {
     const programmatic = isDetentProgrammatic(detent);
     const value = resolveDetentValue(detent);
@@ -179,6 +192,14 @@ export const BottomSheet = (props: BottomSheetProps) => {
       return {
         value: 0,
         kind: 'content',
+        programmatic,
+      };
+    }
+
+    if (value === 'fullscreen') {
+      return {
+        value: 0,
+        kind: 'fullscreen',
         programmatic,
       };
     }
@@ -192,6 +213,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
       programmatic,
     };
   });
+
 
   const clampedIndex = Math.max(0, Math.min(index, nativeDetents.length - 1));
   const selectedDetentValue = detents[clampedIndex]
@@ -224,7 +246,6 @@ export const BottomSheet = (props: BottomSheetProps) => {
         NativeProps & { children?: ReactNode }
       >
   );
-
   const sheet = (
     <View
       style={StyleSheet.absoluteFill}
@@ -254,6 +275,8 @@ export const BottomSheet = (props: BottomSheetProps) => {
           ]}
           detents={nativeDetents}
           extendUnderStatusBar={extendUnderStatusBar}
+          safeAreaTopInset={insets.top}
+          fullscreenTopOffset={resolvedFullscreenTopOffset}
           index={index}
           animateIn={animateIn}
           animateContentHeight={animateContentHeight}

@@ -13,6 +13,18 @@ using namespace facebook::react;
   return concreteComponentDescriptorProvider<BottomSheetSurfaceViewComponentDescriptor>();
 }
 
+- (void)layoutSubviews
+{
+  [super layoutSubviews];
+  UIView *contentView = self.contentView;
+  if (contentView != nil) {
+    contentView.frame = self.bounds;
+  }
+  for (UIView *subview in contentView.subviews) {
+    subview.frame = contentView.bounds;
+  }
+}
+
 @end
 
 Class<RCTComponentViewProtocol> BottomSheetSurfaceViewCls(void)

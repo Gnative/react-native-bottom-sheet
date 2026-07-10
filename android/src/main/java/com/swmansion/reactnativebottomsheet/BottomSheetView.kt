@@ -139,6 +139,10 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
 
   fun setScrimOpacities(values: List<Float>) = host.setScrimOpacities(values)
 
+  fun setSafeAreaTopInset(safeAreaTopInset: Double) = host.setSafeAreaTopInset(safeAreaTopInset)
+
+  fun setFullscreenTopOffset(fullscreenTopOffset: Double) =
+    host.setFullscreenTopOffset(fullscreenTopOffset)
   fun setNativeOverlay(value: Boolean) {
     if (value == nativeOverlay) return
     nativeOverlay = value

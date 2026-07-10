@@ -85,6 +85,16 @@
   return _impl.contentRegionInset;
 }
 
+- (void)setSafeAreaTopInset:(CGFloat)safeAreaTopInset
+{
+  _impl.safeAreaTopInset = safeAreaTopInset;
+}
+
+- (void)setFullscreenTopOffset:(CGFloat)fullscreenTopOffset
+{
+  _impl.fullscreenTopOffset = fullscreenTopOffset;
+}
+
 - (void)setDetentIndex:(NSInteger)newIndex
 {
   [_impl setDetentIndex:newIndex];

@@ -21,6 +21,7 @@ private struct DetentSpec: Equatable {
 private enum DetentKind {
   case points
   case content
+  case fullscreen
 }
 
 private struct RawDetentSpec {
@@ -76,6 +77,14 @@ public final class BottomSheetHostingView: UIView {
     }
   }
 
+  public var safeAreaTopInset: CGFloat = 0 {
+    didSet { updateSurfaceExtension() }
+  }
+
+  public var fullscreenTopOffset: CGFloat = 22 {
+    didSet { updateSurfaceExtension() }
+  }
+
   public var disableScrollableNegotiation: Bool = false
 
   private var rawDetentSpecs: [RawDetentSpec] = []
@@ -109,6 +118,7 @@ public final class BottomSheetHostingView: UIView {
   private var isContentInteractionDisabled = false
   private var contentHeightMarker: UIView?
   private weak var surfaceView: UIView?
+  private var lastSurfaceExtensionHeight: CGFloat = .nan
   private static var markerObservationContext = 0
   private static let springAnimationKey = "bottomSheetSettle"
 
@@ -187,16 +197,16 @@ public final class BottomSheetHostingView: UIView {
 
     scrimView.frame = bounds
     refreshDetentsFromLayout()
-    let maxHeight = sheetContainerHeight
-    lastAppliedMaxDetentHeight = maxHeight
-    sheetContainer.bounds = CGRect(x: 0, y: 0, width: bounds.width, height: maxHeight)
-    sheetContainer.center = CGPoint(x: bounds.width / 2, y: bounds.height - maxHeight / 2)
+    let containerHeight = sheetContainerHeight
+    lastAppliedMaxDetentHeight = containerHeight
+    sheetContainer.bounds = CGRect(x: 0, y: 0, width: bounds.width, height: containerHeight)
+    sheetContainer.center = CGPoint(x: bounds.width / 2, y: bounds.height - containerHeight / 2)
 
     // The surface fills the full container so it always covers the visible sheet
     // (the container is translated to the current sheet position), regardless of
     // how short the content becomes. Sized from the top via frame — never via
     // anchorPoint.
-    surfaceView?.frame = sheetContainer.bounds
+    updateSurfaceExtension()
 
     // Report fresh native geometry so the component layer can push the content
     // wrapper's target size (and the overlay frame) into the shadow tree.
@@ -234,6 +244,7 @@ public final class BottomSheetHostingView: UIView {
     if activeSpring != nil || isPanning { return }
     sheetContainer.transform = CGAffineTransform(translationX: 0, y: translationY(for: targetIndex))
     updateScrim()
+    updateSurfaceExtension()
   }
 
   private var presentedSheetFrame: CGRect {
@@ -278,7 +289,8 @@ public final class BottomSheetHostingView: UIView {
         return nil
       }
       let kindString = (dict["kind"] as? String) ?? ((dict["kind"] as? NSString) as String?) ?? "points"
-      let kind: DetentKind = kindString == "content" ? .content : .points
+      let kind: DetentKind =
+        kindString == "content" ? .content : kindString == "fullscreen" ? .fullscreen : .points
       let programmatic = (dict["programmatic"] as? Bool) ?? (dict["programmatic"] as? NSNumber)?.boolValue ?? false
       return RawDetentSpec(value: CGFloat(value), kind: kind, programmatic: programmatic)
     }
@@ -370,6 +382,7 @@ public final class BottomSheetHostingView: UIView {
     setContentInteractionEnabled(true)
     stopObservingContentHeightMarker()
     surfaceView = nil
+    lastSurfaceExtensionHeight = .nan
     sheetContainer.transform = .identity
     scrimView.alpha = 0
     scrimView.isHidden = true
@@ -462,19 +475,47 @@ public final class BottomSheetHostingView: UIView {
   }
 
   private var currentSheetHeight: CGFloat {
-    let maxHeight = sheetContainerHeight
-    let ty = currentTranslationY
-    return maxHeight - ty
+    sheetContainerHeight - currentTranslationY
+  }
+
+  private var currentSheetTop: CGFloat {
+    currentTranslationY
+  }
+
+  private func surfaceExtensionHeight(forSheetTop sheetTop: CGFloat) -> CGFloat {
+    let maxDetentHeight = detentSpecs.map(\.height).max() ?? 0
+    if maxDetentHeight >= sheetContainerHeight - 0.5 {
+      return 0
+    }
+    let topInset = max(0, safeAreaTopInset)
+    let topOffset = max(0, fullscreenTopOffset)
+    let travel = topInset - topOffset
+    guard topInset > 0, travel > 0 else { return 0 }
+    let progress = min(max((topInset - sheetTop) / travel, 0), 1)
+    // Interpolate the surface extension only up to the fullscreen top offset,
+    // then cap it by the live sheet top so under-status-bar sheets cannot
+    // overshoot above the screen.
+    return min(max(0, sheetTop), topOffset * progress)
+  }
+
+  private func updateSurfaceExtension() {
+    guard let surfaceView else { return }
+    let extensionHeight = surfaceExtensionHeight(forSheetTop: currentSheetTop)
+    if abs(extensionHeight - lastSurfaceExtensionHeight) <= 0.5, surfaceView.bounds.width > 0 {
+      return
+    }
+    lastSurfaceExtensionHeight = extensionHeight
+    let bounds = sheetContainer.bounds
+    surfaceView.frame = CGRect(
+      x: 0,
+      y: -extensionHeight,
+      width: bounds.width,
+      height: bounds.height + extensionHeight
+    )
   }
 
   public var currentContentOffsetY: CGFloat {
-    // The content's in-host displacement from its Yoga position: the container
-    // offset plus the sheet's translation. The content-region inset shrinks
-    // the content via Yoga BOTTOM padding, keeping the Yoga origin at zero, so
-    // the full displacement is carried here.
-    let maxHeight = sheetContainerHeight
-    let containerTop = bounds.height - maxHeight
-    return containerTop + currentTranslationY
+    currentTranslationY
   }
 
   public var isModalAccessibilityActive: Bool {
@@ -493,6 +534,7 @@ public final class BottomSheetHostingView: UIView {
     let position = maxHeight - ty
     updateScrim(forPosition: position)
     updateSheetVisibility(forPosition: position)
+    updateSurfaceExtension()
     updateInteractionState()
     eventDelegate?.bottomSheetHostingView(
       self, didChangePosition: position, index: detentIndex(forPosition: position)
@@ -947,7 +989,10 @@ public final class BottomSheetHostingView: UIView {
   /// sheet's height and the detent cap. Reported into the shadow tree, where
   /// it becomes Yoga bottom padding on the sheet node.
   public var contentRegionInset: CGFloat {
-    max(0, bounds.height - resolvedMaxDetentHeight)
+    let standardInset = max(0, bounds.height - resolvedMaxDetentHeight)
+    let fullscreenInset = max(0, fullscreenTopOffset)
+    let hasFullscreenDetent = rawDetentSpecs.contains { $0.kind == .fullscreen }
+    return hasFullscreenDetent ? min(standardInset, fullscreenInset) : standardInset
   }
 
   /// Stable coordinate base for the sheet container. The container is sized to
@@ -957,12 +1002,13 @@ public final class BottomSheetHostingView: UIView {
   /// animate the sheet down to its new height. The surface fills this canvas, so
   /// the area below the shrunken content stays covered throughout.
   private var sheetContainerHeight: CGFloat {
-    resolvedMaxDetentHeight
+    bounds.height
   }
 
   private func resolveDetentSpecs() -> [DetentSpec]? {
     let maxHeight = resolvedMaxDetentHeight
-    let measuredContentHeight = maxHeight > 0 ? validContentHeight.map { min($0, maxHeight) } : nil
+    let measuredContentHeight =
+      maxHeight > 0 ? validContentHeight.map { min($0, maxHeight) } : nil
     var resolvedDetents: [DetentSpec] = []
     resolvedDetents.reserveCapacity(rawDetentSpecs.count)
 
@@ -973,9 +1019,14 @@ public final class BottomSheetHostingView: UIView {
         height = spec.value
       case .content:
         height =
-          measuredContentHeight ?? unresolvedContentDetentHeight(after: index, maxHeight: maxHeight)
+          measuredContentHeight
+          ?? unresolvedContentDetentHeight(after: index, maxHeight: maxHeight)
+      case .fullscreen:
+        height = sheetContainerHeight - max(0, fullscreenTopOffset)
       }
-      let resolvedHeight = min(max(0, height), maxHeight)
+      let resolvedHeight = spec.kind == .fullscreen
+        ? min(max(0, height), sheetContainerHeight)
+        : min(max(0, height), maxHeight)
       if let previous = resolvedDetents.last, resolvedHeight < previous.height {
         let message =
           "Invalid bottom sheet detent at index \(index): resolved height \(resolvedHeight) is lower than previous detent height \(previous.height). Detents must be passed in ascending order."
@@ -992,14 +1043,24 @@ public final class BottomSheetHostingView: UIView {
     return resolvedDetents
   }
 
-  private func unresolvedContentDetentHeight(after index: Int, maxHeight: CGFloat) -> CGFloat {
+  private func unresolvedContentDetentHeight(
+    after index: Int,
+    maxHeight: CGFloat
+  ) -> CGFloat {
     guard index + 1 < rawDetentSpecs.count else {
       return maxHeight
     }
-    let nextPointHeight = rawDetentSpecs[(index + 1)...]
-      .first { $0.kind == .points }
-      .map(\.value)
-    return min(max(0, nextPointHeight ?? maxHeight), maxHeight)
+    let nextHeight = rawDetentSpecs[(index + 1)...].first.map { spec in
+      switch spec.kind {
+      case .points:
+        return spec.value
+      case .content:
+        return maxHeight
+      case .fullscreen:
+        return sheetContainerHeight - max(0, fullscreenTopOffset)
+      }
+    }
+    return min(max(0, nextHeight ?? maxHeight), maxHeight)
   }
 
   private func refreshDetentsFromLayout() {
@@ -1192,6 +1253,8 @@ public final class BottomSheetHostingView: UIView {
       return false
     case .content:
       return validContentHeight == nil
+    case .fullscreen:
+      return false
     }
   }
 }
