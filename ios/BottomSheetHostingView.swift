@@ -1099,7 +1099,7 @@ public final class BottomSheetHostingView: UIView {
             targetIndex,
             velocity: 0,
             emitIndexChange: false,
-            emitSettle: false,
+            emitSettle: true,
             preserveScrimPin: true
           )
         }

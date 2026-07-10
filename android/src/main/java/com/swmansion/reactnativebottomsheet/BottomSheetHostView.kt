@@ -515,7 +515,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
               targetIndex,
               0f,
               emitIndexChange = false,
-              emitSettle = false,
+              emitSettle = true,
               preserveScrimPin = true,
             )
           }
