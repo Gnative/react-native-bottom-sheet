@@ -24,6 +24,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, weak, nullable) id<BottomSheetContentViewDelegate> delegate;
 @property (nonatomic) BOOL animateIn;
 @property (nonatomic) BOOL animateContentHeight;
+@property (nonatomic) CGFloat animationDurationMs;
+@property (nonatomic) BOOL debugSurfaceBorders;
 @property (nonatomic) BOOL modal;
 @property (nonatomic) BOOL disableScrollableNegotiation;
 @property (nonatomic, readonly) UIView *sheetContainer;
@@ -38,6 +40,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (CGFloat)contentRegionInset;
 - (void)setSafeAreaTopInset:(CGFloat)safeAreaTopInset;
 - (void)setFullscreenTopOffset:(CGFloat)fullscreenTopOffset;
+- (void)setDetentSpacing:(NSArray<NSNumber *> *)detentSpacing;
+- (void)setDetentCornerRadius:(NSArray<NSNumber *> *)detentCornerRadius;
 - (void)setDetentIndex:(NSInteger)newIndex;
 - (void)setScrimColor:(UIColor *_Nullable)color;
 - (void)setScrimOpacities:(NSArray<NSNumber *> *)opacities;

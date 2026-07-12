@@ -10,6 +10,7 @@ export type CaseKey =
   | 'keyboard-content-detent'
   | 'keyboard-aware-list'
   | 'scrim-opacity'
+  | 'collapsed-surface'
   | 'inline-detents'
   | 'under-status-bar'
   | 'content-larger-detent'
@@ -87,6 +88,11 @@ export const DEMO_CASES: DemoCase[] = [
     key: 'scrim-opacity',
     title: 'Per-detent scrim opacity',
     href: '/scrim-opacity',
+  },
+  {
+    key: 'collapsed-surface',
+    title: 'Collapsed surface',
+    href: '/collapsed-surface',
   },
   {
     key: 'inline-detents',

@@ -80,6 +80,10 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   private var targetIndex: Int = 0
   var animateIn: Boolean = true
   var animateContentHeight: Boolean = true
+  var animationDurationMs: Float = 450f
+    set(value) {
+      field = value.coerceAtLeast(1f)
+    }
   var modal: Boolean = false
     set(value) {
       field = value
@@ -929,7 +933,8 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
         spring =
           SpringForce(targetTy).apply {
             dampingRatio = SpringForce.DAMPING_RATIO_NO_BOUNCY
-            stiffness = SpringForce.STIFFNESS_MEDIUM
+            val durationScale = animationDurationMs / 450f
+            stiffness = SpringForce.STIFFNESS_MEDIUM / (durationScale * durationScale)
           }
         setMinValue(minAnimationTy)
         setMaxValue(maxAnimationTy)

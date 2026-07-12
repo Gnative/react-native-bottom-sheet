@@ -52,11 +52,11 @@ export const SheetBackground = ({
         backgroundColor: 'white',
         borderTopLeftRadius: 16,
         borderTopRightRadius: 16,
-        shadowColor: '#000',
-        shadowOpacity: 0.19,
-        shadowRadius: 5.62,
+        shadowColor: 'red',
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
         elevation: 6,
-        shadowOffset: { height: 4 },
+        shadowOffset: { height: 2 },
       },
       style,
     ]}
@@ -72,8 +72,8 @@ export const SheetHeader = ({
   title: string;
   onClose: () => void;
 }) => (
-  <View style={{ borderWidth: 1 }}>
-    <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 4, backgroundColor:'pink' }}>
+  <View>
+    <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 4 }}>
       <View
         style={{
           width: 36,

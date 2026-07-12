@@ -133,6 +133,15 @@ class BottomSheetViewManager :
   override fun setFullscreenTopOffset(view: BottomSheetView, fullscreenTopOffset: Double) {
     view.setFullscreenTopOffset(fullscreenTopOffset)
   }
+
+  // This visual treatment is currently implemented by the iOS surface layer.
+  // Keep the generated cross-platform prop contract without changing Android.
+  @ReactProp(name = "detentSpacing")
+  override fun setDetentSpacing(view: BottomSheetView, value: ReadableArray?) = Unit
+
+  @ReactProp(name = "detentCornerRadius")
+  override fun setDetentCornerRadius(view: BottomSheetView, value: ReadableArray?) = Unit
+
   @ReactProp(name = "index")
   override fun setIndex(view: BottomSheetView, index: Int) {
     view.setIndex(index)
@@ -147,6 +156,14 @@ class BottomSheetViewManager :
   override fun setAnimateContentHeight(view: BottomSheetView, animateContentHeight: Boolean) {
     view.animateContentHeight = animateContentHeight
   }
+
+  @ReactProp(name = "animationDurationMs")
+  override fun setAnimationDurationMs(view: BottomSheetView, value: Double) {
+    view.animationDurationMs = value.toFloat()
+  }
+
+  @ReactProp(name = "debugSurfaceBorders")
+  override fun setDebugSurfaceBorders(view: BottomSheetView, value: Boolean) = Unit
 
   @ReactProp(name = "modal")
   override fun setModal(view: BottomSheetView, modal: Boolean) {

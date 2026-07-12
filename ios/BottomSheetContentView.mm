@@ -45,6 +45,26 @@
   _impl.animateContentHeight = animateContentHeight;
 }
 
+- (CGFloat)animationDurationMs
+{
+  return _impl.animationDurationMs;
+}
+
+- (void)setAnimationDurationMs:(CGFloat)animationDurationMs
+{
+  _impl.animationDurationMs = animationDurationMs;
+}
+
+- (BOOL)debugSurfaceBorders
+{
+  return _impl.debugSurfaceBorders;
+}
+
+- (void)setDebugSurfaceBorders:(BOOL)debugSurfaceBorders
+{
+  _impl.debugSurfaceBorders = debugSurfaceBorders;
+}
+
 - (UIView *)sheetContainer
 {
   return _impl.sheetContainer;
@@ -93,6 +113,16 @@
 - (void)setFullscreenTopOffset:(CGFloat)fullscreenTopOffset
 {
   _impl.fullscreenTopOffset = fullscreenTopOffset;
+}
+
+- (void)setDetentSpacing:(NSArray<NSNumber *> *)detentSpacing
+{
+  [_impl setDetentSpacing:detentSpacing];
+}
+
+- (void)setDetentCornerRadius:(NSArray<NSNumber *> *)detentCornerRadius
+{
+  [_impl setDetentCornerRadius:detentCornerRadius];
 }
 
 - (void)setDetentIndex:(NSInteger)newIndex

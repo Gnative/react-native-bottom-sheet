@@ -15,9 +15,13 @@ export interface NativeProps extends ViewProps {
   detents: ReadonlyArray<NativeDetent>;
   safeAreaTopInset: CodegenTypes.Double;
   fullscreenTopOffset: CodegenTypes.Double;
+  detentSpacing?: ReadonlyArray<CodegenTypes.Double>;
+  detentCornerRadius?: ReadonlyArray<CodegenTypes.Double>;
   index: CodegenTypes.Int32;
   animateIn?: CodegenTypes.WithDefault<boolean, true>;
   animateContentHeight?: CodegenTypes.WithDefault<boolean, true>;
+  animationDurationMs?: CodegenTypes.Double;
+  debugSurfaceBorders?: boolean;
   modal: boolean;
   nativeOverlay?: boolean;
   // Consulted natively only in native-overlay mode, where the detent cap is

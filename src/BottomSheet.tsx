@@ -68,6 +68,10 @@ export interface BottomSheetProps {
    * @default true
    */
   animateContentHeight?: boolean;
+  /** Native sheet snap animation duration in milliseconds. */
+  animationDurationMs?: number;
+  /** iOS-only debug borders for native surface/mask geometry. */
+  debugSurfaceBorders?: boolean;
   /**
    * Whether the sheet may extend under the status bar when using full-height
    * detents. Defaults to `false`, so detents remain capped below the status bar.
@@ -81,6 +85,30 @@ export interface BottomSheetProps {
    * @default 22
    */
   fullscreenTopOffset?: number;
+  /**
+   * On iOS, horizontal and bottom inset in points applied to `surface` at each
+   * detent. Values are interpolated between detents, so `[20, 0]` makes the
+   * shortest detent a floating island and the next detent full width. Missing
+   * values default to 0; an empty array disables spacing.
+   *
+   * Requires `surface`; content is not clipped.
+   */
+  detentSpacing?: number[];
+  /**
+   * Default top corner radius, in points, used for any detent without an
+   * explicit `detentCornerRadius` value.
+   *
+   * @default 12
+   */
+  detentDefaultCornerRadius?: number;
+  /**
+   * On iOS, top corner radius in points applied to `surface` at each detent.
+   * Values are interpolated between detents. Missing values use
+   * `detentDefaultCornerRadius`.
+   *
+   * Requires `surface`; content is not clipped.
+   */
+  detentCornerRadius?: number[];
   /**
    * Called when a user-driven snap is initiated: the moment a drag commits to a
    * detent, before the animation settles. Does not fire for programmatic `index`
@@ -165,8 +193,13 @@ export const BottomSheet = (props: BottomSheetProps) => {
     index,
     animateIn = true,
     animateContentHeight = true,
+    animationDurationMs,
+    debugSurfaceBorders = false,
     extendUnderStatusBar = false,
     fullscreenTopOffset = 22,
+    detentSpacing = [],
+    detentDefaultCornerRadius = 12,
+    detentCornerRadius,
     onIndexChange,
     onSettle,
     onGestureStart,
@@ -190,6 +223,31 @@ export const BottomSheet = (props: BottomSheetProps) => {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const resolvedFullscreenTopOffset = Math.max(0, fullscreenTopOffset);
+  const resolvedAnimationDurationMs = resolveNonNegativeNumber(
+    animationDurationMs,
+    450
+  );
+  const resolvedDetentDefaultCornerRadius = resolveNonNegativeNumber(
+    detentDefaultCornerRadius,
+    12
+  );
+  const resolvedDetentSpacing =
+    detentSpacing.length === 0
+      ? []
+      : detents.map((_, detentIndex) =>
+          resolveNonNegativeNumber(detentSpacing[detentIndex], 0)
+        );
+  const hasDetentCornerRadius =
+    detentCornerRadius != null && detentCornerRadius.length > 0;
+  const resolvedDetentCornerRadius =
+    !hasDetentCornerRadius && resolvedDetentDefaultCornerRadius === 0
+      ? undefined
+      : detents.map((_, detentIndex) =>
+          resolveNonNegativeNumber(
+            detentCornerRadius?.[detentIndex],
+            resolvedDetentDefaultCornerRadius
+          )
+        );
   const nativeDetents = detents.map((detent) => {
     const programmatic = isDetentProgrammatic(detent);
     const value = resolveDetentValue(detent);
@@ -219,7 +277,6 @@ export const BottomSheet = (props: BottomSheetProps) => {
       programmatic,
     };
   });
-
 
   const clampedIndex = Math.max(0, Math.min(index, nativeDetents.length - 1));
   const selectedDetentValue = detents[clampedIndex]
@@ -289,9 +346,13 @@ export const BottomSheet = (props: BottomSheetProps) => {
           extendUnderStatusBar={extendUnderStatusBar}
           safeAreaTopInset={insets.top}
           fullscreenTopOffset={resolvedFullscreenTopOffset}
+          detentSpacing={resolvedDetentSpacing}
+          detentCornerRadius={resolvedDetentCornerRadius}
           index={index}
           animateIn={animateIn}
           animateContentHeight={animateContentHeight}
+          animationDurationMs={resolvedAnimationDurationMs}
+          debugSurfaceBorders={debugSurfaceBorders}
           modal={modal}
           nativeOverlay={usesNativeOverlay}
           disableScrollableNegotiation={disableScrollableNegotiation}
@@ -355,6 +416,12 @@ function resolveDetentValue(detent: Detent) {
     return detent.value;
   }
   return detent;
+}
+
+function resolveNonNegativeNumber(value: number | undefined, fallback: number) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0, value)
+    : fallback;
 }
 
 const styles = StyleSheet.create({

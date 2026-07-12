@@ -117,6 +117,12 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
       host.animateContentHeight = value
     }
 
+  var animationDurationMs: Float
+    get() = host.animationDurationMs
+    set(value) {
+      host.animationDurationMs = value
+    }
+
   var modal: Boolean
     get() = host.modal
     set(value) {

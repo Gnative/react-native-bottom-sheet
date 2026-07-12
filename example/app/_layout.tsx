@@ -81,6 +81,10 @@ export default function RootLayout() {
               }}
             />
             <Stack.Screen
+              name="collapsed-surface"
+              options={{ title: 'Collapsed surface', headerShown: false }}
+            />
+            <Stack.Screen
               name="inline-detents"
               options={{ title: 'Inline with detents', headerShown: false }}
             />

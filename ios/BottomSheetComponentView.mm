@@ -114,6 +114,22 @@ using namespace facebook::react;
     [_sheetView setFullscreenTopOffset:newViewProps.fullscreenTopOffset];
   }
 
+  if (newViewProps.detentSpacing != oldViewProps.detentSpacing) {
+    NSMutableArray<NSNumber *> *spacing = [NSMutableArray new];
+    for (const auto &value : newViewProps.detentSpacing) {
+      [spacing addObject:@(value)];
+    }
+    [_sheetView setDetentSpacing:spacing];
+  }
+
+  if (newViewProps.detentCornerRadius != oldViewProps.detentCornerRadius) {
+    NSMutableArray<NSNumber *> *cornerRadius = [NSMutableArray new];
+    for (const auto &value : newViewProps.detentCornerRadius) {
+      [cornerRadius addObject:@(value)];
+    }
+    [_sheetView setDetentCornerRadius:cornerRadius];
+  }
+
   if (_needsIndexSyncAfterRecycle || newViewProps.index != oldViewProps.index) {
     [_sheetView setDetentIndex:newViewProps.index];
     _needsIndexSyncAfterRecycle = NO;
@@ -125,6 +141,14 @@ using namespace facebook::react;
 
   if (newViewProps.animateContentHeight != oldViewProps.animateContentHeight) {
     _sheetView.animateContentHeight = newViewProps.animateContentHeight;
+  }
+
+  if (newViewProps.animationDurationMs != oldViewProps.animationDurationMs) {
+    _sheetView.animationDurationMs = newViewProps.animationDurationMs;
+  }
+
+  if (newViewProps.debugSurfaceBorders != oldViewProps.debugSurfaceBorders) {
+    _sheetView.debugSurfaceBorders = newViewProps.debugSurfaceBorders;
   }
 
   if (newViewProps.modal != oldViewProps.modal) {
