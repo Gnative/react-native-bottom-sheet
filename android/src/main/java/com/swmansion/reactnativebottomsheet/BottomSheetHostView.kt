@@ -39,6 +39,10 @@ interface BottomSheetViewListener {
 
   fun onSettle(index: Int)
 
+  fun onGestureStart()
+
+  fun onGestureEnd()
+
   fun onPositionChange(position: Double, index: Double)
 }
 
@@ -1120,7 +1124,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
       }
       MotionEvent.ACTION_UP,
       MotionEvent.ACTION_CANCEL -> {
-        isPanning = false
+        endPan()
         activePointerId = MotionEvent.INVALID_POINTER_ID
         val velocity =
           velocityTracker?.let { tracker ->
@@ -1159,7 +1163,9 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   }
 
   private fun beginPan(event: MotionEvent) {
+    if (isPanning) return
     isPanning = true
+    listener?.onGestureStart()
     scrimPinnedFull = false
     panStartingIndex = targetIndex
     val dragDetentSpecs = detentSpecs.toList()
@@ -1174,6 +1180,12 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
       it.cancel()
       activeAnimation = null
     }
+  }
+
+  private fun endPan() {
+    if (!isPanning) return
+    isPanning = false
+    listener?.onGestureEnd()
   }
 
   // Announce to ancestors that the sheet is taking over the touch stream. The

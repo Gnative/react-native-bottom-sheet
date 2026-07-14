@@ -155,6 +155,16 @@
   [self.delegate bottomSheetView:self didSettle:index];
 }
 
+- (void)bottomSheetHostingViewDidStartGesture:(BottomSheetHostingView *)view
+{
+  [self.delegate bottomSheetViewDidStartGesture:self];
+}
+
+- (void)bottomSheetHostingViewDidEndGesture:(BottomSheetHostingView *)view
+{
+  [self.delegate bottomSheetViewDidEndGesture:self];
+}
+
 - (void)bottomSheetHostingView:(BottomSheetHostingView *)view
               didChangePosition:(CGFloat)position
                           index:(CGFloat)index

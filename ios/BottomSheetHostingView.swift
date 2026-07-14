@@ -3,6 +3,8 @@ import UIKit
 @objc public protocol BottomSheetHostingViewDelegate: AnyObject {
   func bottomSheetHostingView(_ view: BottomSheetHostingView, didChangeIndex index: Int)
   func bottomSheetHostingView(_ view: BottomSheetHostingView, didSettle index: Int)
+  func bottomSheetHostingViewDidStartGesture(_ view: BottomSheetHostingView)
+  func bottomSheetHostingViewDidEndGesture(_ view: BottomSheetHostingView)
   func bottomSheetHostingView(
     _ view: BottomSheetHostingView, didChangePosition position: CGFloat, index: CGFloat
   )
@@ -745,6 +747,7 @@ public final class BottomSheetHostingView: UIView {
     switch gesture.state {
     case .began:
       isPanning = true
+      eventDelegate?.bottomSheetHostingViewDidStartGesture(self)
       scrimPinnedFull = false
       panStartingIndex = targetIndex
       activeDragDetentSpecs = detentSpecs
@@ -771,7 +774,11 @@ public final class BottomSheetHostingView: UIView {
       emitPosition()
 
     case .ended:
+      let wasPanning = isPanning
       isPanning = false
+      if wasPanning {
+        eventDelegate?.bottomSheetHostingViewDidEndGesture(self)
+      }
       setContentInteractionEnabled(true)
       let velocity = gesture.velocity(in: self).y
       let currentHeight = maxHeight - sheetContainer.transform.ty
@@ -796,7 +803,11 @@ public final class BottomSheetHostingView: UIView {
       snapToIndex(index, velocity: velocity)
 
     case .cancelled:
+      let wasPanning = isPanning
       isPanning = false
+      if wasPanning {
+        eventDelegate?.bottomSheetHostingViewDidEndGesture(self)
+      }
       setContentInteractionEnabled(true)
       let cancelVelocity = gesture.velocity(in: self).y
       let cancelHeight = maxHeight - sheetContainer.transform.ty
@@ -821,7 +832,11 @@ public final class BottomSheetHostingView: UIView {
       snapToIndex(cancelIndex, velocity: cancelVelocity)
 
     case .failed:
+      let wasPanning = isPanning
       isPanning = false
+      if wasPanning {
+        eventDelegate?.bottomSheetHostingViewDidEndGesture(self)
+      }
       panStartingIndex = nil
       activeDragRange = nil
       activeDragDetentSpecs = nil

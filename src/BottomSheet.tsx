@@ -90,6 +90,10 @@ export interface BottomSheetProps {
   onIndexChange?: (index: number) => void;
   /** Called when a snap animation settles, including programmatic changes. */
   onSettle?: (index: number) => void;
+  /** Called when the sheet starts handling a user drag gesture. */
+  onGestureStart?: () => void;
+  /** Called when the sheet stops handling a user drag gesture. */
+  onGestureEnd?: () => void;
   /**
    * Called as the sheet position changes. A standard native direct event; read
    * `event.nativeEvent.position` (points from the bottom). To handle it on the
@@ -165,6 +169,8 @@ export const BottomSheet = (props: BottomSheetProps) => {
     fullscreenTopOffset = 22,
     onIndexChange,
     onSettle,
+    onGestureStart,
+    onGestureEnd,
     onPositionChange,
     wrapNativeView,
     modal = false,
@@ -231,6 +237,12 @@ export const BottomSheet = (props: BottomSheetProps) => {
   const handleSettle = (event: { nativeEvent: { index: number } }) => {
     onSettle?.(event.nativeEvent.index);
   };
+  const handleGestureStart = () => {
+    onGestureStart?.();
+  };
+  const handleGestureEnd = () => {
+    onGestureEnd?.();
+  };
 
   // The native sheet view, optionally wrapped (e.g. with
   // `Animated.createAnimatedComponent`) so a Reanimated worklet can handle
@@ -287,6 +299,8 @@ export const BottomSheet = (props: BottomSheetProps) => {
           scrimOpacities={resolvedScrimOpacity}
           onIndexChange={handleIndexChange}
           onSettle={handleSettle}
+          onGestureStart={handleGestureStart}
+          onGestureEnd={handleGestureEnd}
           onPositionChange={onPositionChange}
         >
           {surface != null && (

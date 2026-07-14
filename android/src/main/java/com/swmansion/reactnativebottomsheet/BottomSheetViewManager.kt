@@ -44,6 +44,14 @@ class BottomSheetViewManager :
           dispatchEvent(view, "topSettle", event)
         }
 
+        override fun onGestureStart() {
+          dispatchEvent(view, "topGestureStart", Arguments.createMap())
+        }
+
+        override fun onGestureEnd() {
+          dispatchEvent(view, "topGestureEnd", Arguments.createMap())
+        }
+
         override fun onPositionChange(position: Double, index: Double) {
           val event =
             Arguments.createMap().apply {
@@ -93,6 +101,8 @@ class BottomSheetViewManager :
     return mapOf(
       "topIndexChange" to mapOf("registrationName" to "onIndexChange"),
       "topSettle" to mapOf("registrationName" to "onSettle"),
+      "topGestureStart" to mapOf("registrationName" to "onGestureStart"),
+      "topGestureEnd" to mapOf("registrationName" to "onGestureEnd"),
       "topPositionChange" to mapOf("registrationName" to "onPositionChange"),
     )
   }
