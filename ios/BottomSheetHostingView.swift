@@ -254,7 +254,11 @@ public final class BottomSheetHostingView: UIView {
     let containerHeight = sheetContainerHeight
     lastAppliedMaxDetentHeight = containerHeight
     sheetContainer.bounds = CGRect(x: 0, y: 0, width: bounds.width, height: containerHeight)
-    sheetContainer.frame = CGRect(x: 0, y: 0, width: bounds.width, height: containerHeight)
+    // `frame` does not describe stable geometry while a transform is active.
+    sheetContainer.center = CGPoint(
+      x: bounds.midX,
+      y: bounds.height - containerHeight / 2
+    )
 
     // The surface fills the full container so it always covers the visible sheet
     // (the container is translated to the current sheet position), regardless of
@@ -1411,9 +1415,39 @@ public final class BottomSheetHostingView: UIView {
     guard !extendUnderStatusBar, let window else {
       return bounds.height
     }
-    let originYInWindow = convert(CGPoint.zero, to: window).y
+
+    // Ignore transient ancestor transforms so navigation animations cannot
+    // continuously change the detent cap during a sheet spring.
+    let originYInWindow =
+      untransformedOriginY(in: window)
+      ?? convert(CGPoint.zero, to: window).y
     let topOverlap = max(0, window.safeAreaInsets.top - originYInWindow)
     return min(max(0, bounds.height - topOverlap), bounds.height)
+  }
+
+  private func untransformedOriginY(in window: UIWindow) -> CGFloat? {
+    var point = CGPoint.zero
+    var currentView: UIView? = self
+
+    while let view = currentView, view !== window {
+      let anchorPoint = view.layer.anchorPoint
+
+      point.x =
+        view.layer.position.x
+        + point.x
+        - view.bounds.minX
+        - view.bounds.width * anchorPoint.x
+
+      point.y =
+        view.layer.position.y
+        + point.y
+        - view.bounds.minY
+        - view.bounds.height * anchorPoint.y
+
+      currentView = view.superview
+    }
+
+    return currentView === window ? point.y : nil
   }
 
   /// The natively measured inset of the content region: the gap between the
