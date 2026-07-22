@@ -40,9 +40,7 @@ export const CollapsedSurfaceScreen = () => {
           scrimColor={MODAL_SCRIM_COLOR}
           //scrimOpacities={[0, 0.25, 0.25, 0.75]}
           surface={<SheetBackground style={StyleSheet.absoluteFill} />}
-
-          //animationDurationMs={2000}
-          //debugSurfaceBorders
+          // animationDurationMs={2000}
         >
           <SheetHeader
             title="Collapsed surface"

@@ -160,10 +160,9 @@ struct SurfaceGeometryResolver {
     guard context.isClosedTransitionGeometryActive else {
       return nil
     }
-    guard context.detentHeights.indices.contains(0), context.detentHeights[0] == 0 else {
-      return nil
-    }
 
+    // Initial presentation also begins at a synthetic zero height, so it does
+    // not require callers to include an actual zero-height detent.
     let candidateIndices = [
       context.closedTransitionGeometryIndex,
       context.activeSpringTargetIndex,

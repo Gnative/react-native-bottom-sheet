@@ -251,6 +251,20 @@ public final class BottomSheetHostingView: UIView {
 
     scrimView.frame = bounds
     refreshDetentsFromLayout()
+
+    // Prime the surface with the destination detent's geometry before placing
+    // the sheet at its synthetic, off-screen starting position. Otherwise this
+    // first layout resolves spacing at height zero (usually the closed detent's
+    // spacing), and the entrance can flash full-width before the spring installs
+    // its surface animation.
+    if !hasLaidOut, animateIn, !detentSpecs.isEmpty {
+      let indexToApply = pendingIndex ?? targetIndex
+      let clampedIndex = max(0, min(detentSpecs.count - 1, indexToApply))
+      if !isInvalidContentDetentTarget(clampedIndex) {
+        prepareInitialSurfaceGeometry(for: clampedIndex)
+      }
+    }
+
     let containerHeight = sheetContainerHeight
     lastAppliedMaxDetentHeight = containerHeight
     sheetContainer.bounds = CGRect(x: 0, y: 0, width: bounds.width, height: containerHeight)
@@ -299,7 +313,7 @@ public final class BottomSheetHostingView: UIView {
       if animateIn {
         let closedTy = sheetContainerHeight
         sheetContainer.transform = CGAffineTransform(translationX: 0, y: closedTy)
-        preserveInitialSurfaceGeometry = true
+        prepareInitialSurfaceGeometry(for: targetIndex)
         updateSurfaceExtension(translationY: closedTy, forcePath: true)
         emitPosition(updateSurface: false)
         snapToIndex(
@@ -692,6 +706,18 @@ public final class BottomSheetHostingView: UIView {
     )
   }
 
+  private func prepareInitialSurfaceGeometry(for index: Int) {
+    preserveInitialSurfaceGeometry = true
+    closedTransitionGeometryIndex =
+      detentSpecs.indices.contains(index) && detentSpecs[index].height > 0.001
+      ? index
+      : detentSpecs.firstIndex(where: { $0.height > 0.001 })
+    // The entrance begins at a synthetic closed position even when callers did
+    // not configure a zero-height detent. Hold the destination spacing/radius
+    // while the sheet grows into view.
+    isClosedTransitionGeometryActive = true
+  }
+
   private func activePanResumeTransition(forTranslationY translationY: CGFloat) -> SurfacePanResumeTransition? {
     guard
       isPanning,
@@ -958,6 +984,10 @@ public final class BottomSheetHostingView: UIView {
       return
     }
 
+    // A transition across the visibility boundary uses the non-zero detent as
+    // its fixed surface geometry: the destination while opening, and the
+    // source while closing. The zero detent's spacing/radius therefore never
+    // morphs a complete card as it enters or leaves the screen.
     let transitionGeometryIndex: Int? = {
       if detentSpecs.indices.contains(index), detentSpecs[index].height > 0.001 {
         return index
@@ -971,9 +1001,10 @@ public final class BottomSheetHostingView: UIView {
     let currentHeight = sheetContainerHeight - currentTranslationY
     let targetHeight = detentSpecs[index].height
     isClosedTransitionGeometryActive =
-      detentSpecs.indices.contains(0)
-      && detentSpecs[0].height == 0
-      && (currentHeight <= 0.5 || targetHeight <= 0.5)
+      preserveInitialSurfaceGeometry
+      || (detentSpecs.indices.contains(0)
+        && detentSpecs[0].height == 0
+        && (currentHeight <= 0.5 || targetHeight <= 0.5))
 
     targetIndex = index
     if !preserveScrimPin {
