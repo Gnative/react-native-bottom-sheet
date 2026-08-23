@@ -20,13 +20,13 @@ private struct DetentSpec: Equatable {
   let programmatic: Bool
 }
 
-private enum DetentKind {
+private enum DetentKind: Equatable {
   case points
   case content
   case fullscreen
 }
 
-private struct RawDetentSpec {
+private struct RawDetentSpec: Equatable {
   let value: CGFloat
   let kind: DetentKind
   let programmatic: Bool
@@ -159,6 +159,11 @@ public final class BottomSheetHostingView: UIView {
   private var activeDragRange: (minTy: CGFloat, maxTy: CGFloat)?
   private var activeDragDetentSpecs: [DetentSpec]?
   private var isContentInteractionDisabled = false
+  // Fabric commits `detents` before the controlled `index`. Starting a snap
+  // between those two prop updates can start competing mask animations from
+  // mismatched coordinate systems. Coalesce them into a single refresh.
+  private var isDetentRefreshScheduled = false
+  private var pendingDetentRefreshSourceGeometry: SurfaceMaskGeometry?
   private var contentHeightMarker: UIView?
   private weak var surfaceView: UIView?
   private let surfaceMaskController = SurfaceMaskController()
@@ -251,6 +256,9 @@ public final class BottomSheetHostingView: UIView {
 
     scrimView.frame = bounds
     refreshDetentsFromLayout()
+    // A controlled index may be arriving in the same Fabric commit as the
+    // detents. Keep the old geometry visually stable until they are reconciled.
+    if isDetentRefreshScheduled { return }
 
     // Prime the surface with the destination detent's geometry before placing
     // the sheet at its synthetic, off-screen starting position. Otherwise this
@@ -372,7 +380,7 @@ public final class BottomSheetHostingView: UIView {
 
   public func setDetents(_ raw: [NSDictionary]) {
     let sourceGeometry = currentSurfaceGeometryForConfigChange()
-    rawDetentSpecs = raw.compactMap { dict in
+    let nextRawDetentSpecs: [RawDetentSpec] = raw.compactMap { dict in
       guard let value = dict["value"] as? Double ?? (dict["value"] as? NSNumber)?.doubleValue else {
         return nil
       }
@@ -382,7 +390,25 @@ public final class BottomSheetHostingView: UIView {
       let programmatic = (dict["programmatic"] as? Bool) ?? (dict["programmatic"] as? NSNumber)?.boolValue ?? false
       return RawDetentSpec(value: CGFloat(value), kind: kind, programmatic: programmatic)
     }
-    refreshDetentsFromLayout(sourceSurfaceGeometry: sourceGeometry)
+    guard nextRawDetentSpecs != rawDetentSpecs else { return }
+    rawDetentSpecs = nextRawDetentSpecs
+
+    guard hasLaidOut else {
+      refreshDetentsFromLayout(sourceSurfaceGeometry: sourceGeometry)
+      return
+    }
+
+    pendingDetentRefreshSourceGeometry = sourceGeometry
+    guard !isDetentRefreshScheduled else { return }
+
+    isDetentRefreshScheduled = true
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.isDetentRefreshScheduled else { return }
+      self.isDetentRefreshScheduled = false
+      let pendingSourceGeometry = self.pendingDetentRefreshSourceGeometry
+      self.pendingDetentRefreshSourceGeometry = nil
+      self.refreshDetentsFromLayout(sourceSurfaceGeometry: pendingSourceGeometry)
+    }
   }
 
   public func setDetentIndex(_ newIndex: Int) {
@@ -390,6 +416,18 @@ public final class BottomSheetHostingView: UIView {
 
     if !hasLaidOut {
       pendingIndex = newIndex
+      targetIndex = newIndex
+      return
+    }
+
+    if isDetentRefreshScheduled {
+      guard rawDetentSpecs.indices.contains(newIndex) else {
+        pendingSnapRequest = nil
+        return
+      }
+
+      // The next main-loop refresh uses this index with the new detents. Do
+      // not animate against the previous detent geometry in the meantime.
       targetIndex = newIndex
       return
     }
@@ -470,6 +508,8 @@ public final class BottomSheetHostingView: UIView {
     targetIndex = 0
     pendingIndex = nil
     pendingSnapRequest = nil
+    isDetentRefreshScheduled = false
+    pendingDetentRefreshSourceGeometry = nil
     hasLaidOut = false
     preserveInitialSurfaceGeometry = false
     activeSpringSurfaceTransition = nil
@@ -1560,6 +1600,9 @@ public final class BottomSheetHostingView: UIView {
   }
 
   private func refreshDetentsFromLayout(sourceSurfaceGeometry: SurfaceMaskGeometry? = nil) {
+    if isDetentRefreshScheduled {
+      return
+    }
     // While detached from a window (e.g. mid-commit, when Fabric reparents the
     // host as ancestor view flattening changes), the native detent cap is not
     // computable — its full-height fallback would register as a cap change and
