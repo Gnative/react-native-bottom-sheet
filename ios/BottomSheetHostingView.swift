@@ -81,8 +81,16 @@ public final class BottomSheetHostingView: UIView {
     didSet { updateSurfaceExtension() }
   }
 
-  public var fullscreenTopOffset: CGFloat = 22 {
-    didSet { updateSurfaceExtension() }
+  // This must match Fabric's codegen default. A prop explicitly set to zero
+  // otherwise compares equal to the default Fabric props and skips the native
+  // setter, leaving a stale host-side offset in place.
+  public var fullscreenTopOffset: CGFloat = 0 {
+    didSet {
+      guard fullscreenTopOffset != oldValue else { return }
+      refreshDetentsFromLayout()
+      setNeedsLayout()
+      updateSurfaceExtension()
+    }
   }
 
   public var disableScrollableNegotiation: Bool = false

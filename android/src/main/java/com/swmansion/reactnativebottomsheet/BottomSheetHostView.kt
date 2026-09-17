@@ -116,7 +116,9 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   private var suppressScrimForClosingTarget = false
   private var scrimPinnedFull = false
   private var safeAreaTopInset = 0f
-  private var fullscreenTopOffset = 22f
+  // Keep this in sync with Fabric's codegen default. When JavaScript supplies
+  // zero, Fabric can omit the setter if both its old and new props are zero.
+  private var fullscreenTopOffset = 0f
   private var contentHeightMarker: View? = null
   private var surfaceView: View? = null
   private var lastSurfaceExtensionHeight = Float.NaN
@@ -392,7 +394,13 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   }
 
   fun setFullscreenTopOffset(fullscreenTopOffset: Double) {
-    this.fullscreenTopOffset = (fullscreenTopOffset * density).toFloat().coerceAtLeast(0f)
+    val resolvedOffset = (fullscreenTopOffset * density).toFloat().coerceAtLeast(0f)
+    if (this.fullscreenTopOffset == resolvedOffset) return
+    this.fullscreenTopOffset = resolvedOffset
+    // The offset changes fullscreen detents and the content-region inset, so
+    // refresh both the native geometry state and the resolved detents.
+    recomputeNativeGeometry()
+    refreshDetentsFromLayout()
     updateSurfaceExtension()
   }
 
