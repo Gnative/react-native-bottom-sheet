@@ -103,6 +103,8 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
 
   fun setDetents(raw: List<Map<String, Any>>) = host.setDetents(raw)
 
+  fun setDetentCornerRadius(values: List<Float>?) = host.setDetentCornerRadius(values)
+
   fun setIndex(newIndex: Int) = host.setIndex(newIndex)
 
   var animateIn: Boolean

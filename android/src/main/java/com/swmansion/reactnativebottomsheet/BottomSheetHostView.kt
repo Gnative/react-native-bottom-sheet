@@ -11,7 +11,6 @@ import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.view.WindowInsets
-import android.widget.FrameLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.dynamicanimation.animation.DynamicAnimation
@@ -101,7 +100,9 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
 
   // MARK: - Internal
 
-  private val sheetContainer = FrameLayout(context)
+  // The host remains un-clipped for elevation/shadows. This translated inner
+  // container clips only the visible surface and React content.
+  private val sheetContainer = TopRoundedClipFrameLayout(context)
   private val scrimPaint = Paint(Paint.ANTI_ALIAS_FLAG)
   private var activeAnimation: SpringAnimation? = null
   private var activeAnimationEmitsSettle = false
@@ -129,6 +130,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
   private var fullscreenTopOffset = 0f
   private var contentHeightMarker: View? = null
   private var surfaceView: View? = null
+  private var detentCornerRadii: List<Float> = emptyList()
   private var lastSurfaceExtensionHeight = Float.NaN
   private var pendingInitialContentDetentSnap = false
   private var pendingInitialContentDetentObserver: ViewTreeObserver? = null
@@ -304,6 +306,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     if (activeAnimation != null || isPanning) return
     sheetContainer.translationY = translationY(targetIndex)
     updateShadowState(sheetContainer.translationY)
+    updateSheetCornerRadius()
   }
 
   override fun dispatchDraw(canvas: Canvas) {
@@ -359,6 +362,11 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
         RawDetentSpec(value = (value * density).toFloat(), kind = kind, programmatic = programmatic)
       }
     refreshDetentsFromLayout()
+  }
+
+  fun setDetentCornerRadius(values: List<Float>?) {
+    detentCornerRadii = values?.map { it.coerceAtLeast(0f) * density } ?: emptyList()
+    updateSheetCornerRadius()
   }
 
   fun setIndex(newIndex: Int) {
@@ -490,6 +498,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
         return
       }
       updateScrim()
+      updateSheetCornerRadius()
       return
     }
 
@@ -762,6 +771,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     val position = maxHeight - ty
     updateScrim(position)
     updateSheetVisibility(position)
+    updateSheetCornerRadius(position)
     updateSurfaceExtension()
     updateInteractionState()
     listener?.onPositionChange((position / density).toDouble(), detentIndexAt(position).toDouble())
@@ -777,6 +787,29 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
 
   private fun updateSheetVisibility(position: Float) {
     sheetContainer.alpha = if (position <= 0.5f) 0f else 1f
+  }
+
+  /** Resolves and applies the mask from the live native sheet position. */
+  private fun updateSheetCornerRadius(position: Float = currentSheetHeight()) {
+    val radius =
+      if (position <= 0.5f) {
+        0f
+      } else {
+        interpolateAtPosition(
+          position,
+          detentSpecs.indices.map(::detentCornerRadiusAt),
+        ).coerceAtLeast(0f)
+      }
+    sheetContainer.setTopCornerRadius(radius)
+  }
+
+  private fun detentCornerRadiusAt(index: Int): Float {
+    // Fullscreen meets the host edge and therefore has square top corners.
+    if (rawDetentSpecs.getOrNull(index)?.kind == DetentKind.FULLSCREEN) return 0f
+    // BottomSheet.tsx forwards its public default (12) for omitted entries.
+    // An absent native prop means the JS caller intentionally disabled it via
+    // detentDefaultCornerRadius={0}, so do not resurrect a stale radius here.
+    return detentCornerRadii.getOrNull(index) ?: 0f
   }
 
   private fun currentSheetTop(): Float = sheetContainer.top + sheetContainer.translationY
@@ -1342,6 +1375,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     lastSurfaceExtensionHeight = Float.NaN
     rawDetentSpecs = emptyList()
     detentSpecs = emptyList()
+    detentCornerRadii = emptyList()
     targetIndex = 0
     pendingIndex = null
     hasLaidOut = false

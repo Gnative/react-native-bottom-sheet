@@ -134,13 +134,14 @@ class BottomSheetViewManager :
     view.setFullscreenTopOffset(fullscreenTopOffset)
   }
 
-  // This visual treatment is currently implemented by the iOS surface layer.
-  // Keep the generated cross-platform prop contract without changing Android.
   @ReactProp(name = "detentSpacing")
   override fun setDetentSpacing(view: BottomSheetView, value: ReadableArray?) = Unit
 
   @ReactProp(name = "detentCornerRadius")
-  override fun setDetentCornerRadius(view: BottomSheetView, value: ReadableArray?) = Unit
+  override fun setDetentCornerRadius(view: BottomSheetView, value: ReadableArray?) {
+    val radii = value?.let { array -> List(array.size()) { array.getDouble(it).toFloat() } }
+    view.setDetentCornerRadius(radii)
+  }
 
   @ReactProp(name = "index")
   override fun setIndex(view: BottomSheetView, index: Int) {

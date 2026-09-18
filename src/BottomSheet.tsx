@@ -102,9 +102,10 @@ export interface BottomSheetProps {
    */
   detentDefaultCornerRadius?: number;
   /**
-   * On iOS, top corner radius in points applied to `surface` at each detent.
-   * Values are interpolated between detents. Missing values use
-   * `detentDefaultCornerRadius`.
+   * Top corner radius in points applied at each detent. Values are
+   * interpolated between detents. Missing values use
+   * `detentDefaultCornerRadius`. On Android, the native clip also constrains
+   * opaque sheet content so it cannot paint over the rounded surface.
    *
    * Requires `surface`; content is not clipped.
    */
