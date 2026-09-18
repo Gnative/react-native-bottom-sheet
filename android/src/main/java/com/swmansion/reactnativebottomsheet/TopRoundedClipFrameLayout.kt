@@ -16,9 +16,10 @@ internal class TopRoundedClipFrameLayout(context: Context) : FrameLayout(context
   private var topCornerRadius = 0f
 
   init {
-    // Android 10+ can use a hardware outline for this convex path. Older
-    // supported Android versions use the identical path in dispatchDraw.
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+    // Android 12+ can use a hardware outline for this convex path. Android 11
+    // does not reliably clip a custom outline during translated animations, so
+    // it uses the identical canvas path in dispatchDraw instead.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
       outlineProvider =
         object : ViewOutlineProvider() {
           override fun getOutline(view: View, outline: Outline) {
@@ -37,7 +38,7 @@ internal class TopRoundedClipFrameLayout(context: Context) : FrameLayout(context
     if (topCornerRadius == resolvedRadius) return
     topCornerRadius = resolvedRadius
     rebuildClipPath()
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
       // Do not clip a square/fullscreen surface: it may intentionally extend
       // above this container for status-bar coverage.
       clipToOutline = resolvedRadius > 0f
@@ -53,7 +54,7 @@ internal class TopRoundedClipFrameLayout(context: Context) : FrameLayout(context
   }
 
   override fun dispatchDraw(canvas: Canvas) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || topCornerRadius <= 0f) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S || topCornerRadius <= 0f) {
       super.dispatchDraw(canvas)
       return
     }
