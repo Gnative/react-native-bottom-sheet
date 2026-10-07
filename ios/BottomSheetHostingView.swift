@@ -1403,18 +1403,20 @@ public final class BottomSheetHostingView: UIView {
   }
 
   private func scrollView(containing location: CGPoint, in view: UIView) -> UIScrollView? {
-    for subview in view.subviews.reversed() {
-      let locationInSubview = view.convert(location, to: subview)
-      guard subview.bounds.contains(locationInSubview) else { continue }
+    // Only inspect the view that UIKit would actually deliver this touch to.
+    // An overlay (such as a sheet header) can visually cover a scroll view;
+    // recursing through every overlapping sibling incorrectly assigns its drag
+    // to that scroll view when it is already offset.
+    var node = view.hitTest(location, with: nil)
 
-      if let found = scrollView(containing: locationInSubview, in: subview) {
-        return found
-      }
-
-      if let scrollView = subview as? UIScrollView, isVerticallyScrollable(scrollView) {
+    while let current = node, current !== view {
+      if let scrollView = current as? UIScrollView, isVerticallyScrollable(scrollView) {
         return scrollView
       }
+
+      node = current.superview
     }
+
     return nil
   }
 
