@@ -18,6 +18,7 @@ import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.uimanager.PointerEvents
+import com.facebook.react.uimanager.ReactPointerEventsView
 import com.facebook.react.uimanager.RootView
 import com.facebook.react.uimanager.StateWrapper
 import com.facebook.react.views.view.ReactViewGroup
@@ -1285,13 +1286,16 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     ) {
       return null
     }
-    return findScrollableAtPoint(sheetContainer, containerX, containerY)
+    return findScrollableAncestor(findTouchTargetAtPoint(sheetContainer, containerX, containerY))
   }
 
-  private fun findScrollableAtPoint(view: View, x: Float, y: Float): View? {
+  private fun findTouchTargetAtPoint(view: View, x: Float, y: Float): View? {
     if (!view.isShown) return null
 
-    if (view is ViewGroup) {
+    val pointerEvents = (view as? ReactPointerEventsView)?.pointerEvents ?: PointerEvents.AUTO
+    if (pointerEvents == PointerEvents.NONE) return null
+
+    if (view is ViewGroup && pointerEvents != PointerEvents.BOX_ONLY) {
       for (i in view.childCount - 1 downTo 0) {
         val child = view.getChildAt(i)
         val childX = x - child.left - child.translationX
@@ -1299,15 +1303,26 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
         if (childX < 0f || childX >= child.width || childY < 0f || childY >= child.height) {
           continue
         }
-        findScrollableAtPoint(child, childX, childY)?.let {
+        findTouchTargetAtPoint(child, childX, childY)?.let {
           return it
         }
       }
     }
 
-    if (isVerticallyScrollable(view)) {
-      return view
+    return if (pointerEvents == PointerEvents.BOX_NONE) null else view
+  }
+
+  private fun findScrollableAncestor(view: View?): View? {
+    var node = view
+
+    while (node != null && node !== sheetContainer) {
+      if (isVerticallyScrollable(node)) {
+        return node
+      }
+
+      node = node.parent as? View
     }
+
     return null
   }
 
