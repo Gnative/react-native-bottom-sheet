@@ -1,5 +1,34 @@
 # Contours bottom-sheet invariants
 
+This forked version adds serveral updates needed for Contours
+
+# Publishing
+
+Ensure you have an `.npmrc` file with credentials.
+GITHUB_TOKEN shoud lexport from your .bashrc file
+
+```
+@gnative:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+```
+
+1. Update package.json to use 
+```
+{
+  "name": "@gnative/react-native-bottom-sheet",
+  "version": "PUBLISH_VERION",
+  "publishConfig": {
+      "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gnative/rnmapbox.git"
+  },
+}
+```
+2. `npm publish`
+
+
 ## Surface geometry at the visibility boundary
 
 On iOS, `detentSpacing` defines the side and bottom spacing of the sheet's
