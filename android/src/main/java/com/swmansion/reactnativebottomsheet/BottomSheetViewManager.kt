@@ -122,6 +122,9 @@ class BottomSheetViewManager :
           "insetLeft" to inset("insetLeft"),
           "insetRight" to inset("insetRight"),
           "insetBottom" to inset("insetBottom"),
+          "borderRadius" to (if (map.hasKey("borderRadius")) map.getDouble("borderRadius") else -1.0),
+          "borderTopRadius" to (if (map.hasKey("borderTopRadius")) map.getDouble("borderTopRadius") else -1.0),
+          "borderBottomRadius" to (if (map.hasKey("borderBottomRadius")) map.getDouble("borderBottomRadius") else -1.0),
           "widestCard" to (map.hasKey("widestCard") && map.getBoolean("widestCard")),
           "scrimOpacity" to
             (if (map.hasKey("scrimOpacity")) map.getDouble("scrimOpacity") else 1.0),
@@ -144,6 +147,10 @@ class BottomSheetViewManager :
 
   override fun setAnimateIn(view: BottomSheetView, animateIn: Boolean) {
     view.animateIn = animateIn
+  }
+
+  override fun setScaleContent(view: BottomSheetView, scaleContent: Boolean) {
+    view.scaleContent = scaleContent
   }
 
   override fun setAnimateContentHeight(view: BottomSheetView, animateContentHeight: Boolean) {

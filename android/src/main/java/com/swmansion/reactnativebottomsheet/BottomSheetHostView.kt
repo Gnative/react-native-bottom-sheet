@@ -65,6 +65,16 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
 
   // MARK: - State
 
+  var scaleContent: Boolean
+    get() = state.scaleContent
+    set(value) {
+      if (state.scaleContent == value) return
+      state.scaleContent = value
+      if (state.hasLaidOut) contentRegion.isContentRegionChangePending = true
+      contentRegion.recomputeNativeGeometry()
+      requestLayout()
+    }
+
   var animateIn: Boolean = true
   var animateContentHeight: Boolean
     get() = state.animateContentHeight

@@ -147,6 +147,10 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
     setIndex(index)
   }
 
+  var scaleContent: Boolean
+    get() = host.scaleContent
+    set(value) { host.scaleContent = value }
+
   var animateIn: Boolean
     get() = host.animateIn
     set(value) {

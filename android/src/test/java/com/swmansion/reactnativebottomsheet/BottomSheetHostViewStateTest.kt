@@ -99,10 +99,9 @@ class BottomSheetHostViewStateTest {
     withSheet { sheet ->
       val wrapper = RecordingStateWrapper()
       sheet.stateWrapper = wrapper
-      val density = sheet.resources.displayMetrics.density
       val floating = mapOf("value" to 300.0, "insetLeft" to 16.0, "insetRight" to 16.0)
 
-      // Laid out against the full-width detent, so the floating card scales it down.
+      // Floating insets must not change content measurement coordinates.
       sheet.setDetents(
         listOf(
           mapOf("value" to 0.0),
@@ -114,10 +113,10 @@ class BottomSheetHostViewStateTest {
       shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
       layout(sheet)
       val scaled = wrapper.updates.last()
-      assertEquals((1080 - 32 * density) / 1080.0, scaled.getValue("contentScale"), 0.001)
-      assertEquals(16.0, scaled.getValue("contentOffsetX"), 0.01)
+      assertEquals(1.0, scaled.getValue("contentScale"), 0.001)
+      assertEquals(0.0, scaled.getValue("contentOffsetX"), 0.01)
 
-      // Laid out against the floating card itself: its margin is what places it.
+      // Changing the widest-card flag must keep the same content coordinates.
       sheet.setDetents(listOf(mapOf("value" to 0.0), floating + ("widestCard" to true)))
       shadowOf(Looper.getMainLooper()).idle()
       layout(sheet)
@@ -176,6 +175,7 @@ class BottomSheetHostViewStateTest {
     val sheet = BottomSheetHostView(controller.get())
     try {
       sheet.animateIn = false
+      sheet.scaleContent = false
       sheet.modal = modal
       sheet.setDetents(listOf(mapOf("value" to 0.0), mapOf("value" to 300.0)))
       sheet.setIndex(index)

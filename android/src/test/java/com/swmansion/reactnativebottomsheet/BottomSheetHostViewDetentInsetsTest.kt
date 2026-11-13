@@ -50,6 +50,33 @@ class BottomSheetHostViewDetentInsetsTest {
   }
 
   @Test
+  fun `a detent can round its top while leaving its bottom square`() {
+    val detents = listOf(points(0.0), points(300.0) + mapOf(
+      "borderTopRadius" to 28.0,
+      "borderBottomRadius" to 0.0,
+    ))
+    withSheet(detents) { sheet ->
+      val d = sheet.density
+      assertFalse(sheet.clip.cardContains(2 * d, 2 * d))
+      assertTrue(sheet.clip.cardContains(2 * d, 298 * d))
+      assertTrue(sheet.clip.cardContains(WIDTH_PX / 2f, 2 * d))
+    }
+  }
+
+  @Test
+  fun `a detent can round its bottom while leaving its top square`() {
+    val detents = listOf(points(0.0), points(300.0) + mapOf(
+      "borderTopRadius" to 0.0,
+      "borderBottomRadius" to 28.0,
+    ))
+    withSheet(detents) { sheet ->
+      val d = sheet.density
+      assertTrue(sheet.clip.cardContains(2 * d, 2 * d))
+      assertFalse(sheet.clip.cardContains(2 * d, 298 * d))
+    }
+  }
+
+  @Test
   fun `a full height detent fits between its top and bottom insets`() {
     withSheet(listOf(points(0.0), percentage(1.0, top = 24.0, bottom = 32.0))) { sheet ->
       val d = sheet.density
@@ -118,27 +145,49 @@ class BottomSheetHostViewDetentInsetsTest {
   }
 
   @Test
-  fun `the content is laid out at the widest card's left inset`() {
+  fun `the content starts at the host origin regardless of side insets`() {
     val detents = listOf(points(100.0, left = 24.0), points(300.0, left = 8.0, widest = true))
     withSheet(detents, index = 1) { sheet ->
-      assertEquals((8 * sheet.density).toInt(), sheet.getSheetChildAt(0)!!.left)
+      assertEquals(0, sheet.getSheetChildAt(0)!!.left)
     }
   }
 
   @Test
-  fun `the content scales to the card and pins to its left edge`() {
+  fun `enabling scaling restores upstream inset transforms`() {
+    val detents = listOf(
+      points(100.0, left = 40.0, right = 40.0),
+      points(300.0, left = 8.0, right = 8.0, widest = true),
+    )
+    withSheet(detents, index = 0) { sheet ->
+      sheet.scaleContent = true
+      sheet.measure(
+        View.MeasureSpec.makeMeasureSpec(WIDTH_PX, View.MeasureSpec.EXACTLY),
+        View.MeasureSpec.makeMeasureSpec(HEIGHT_PX, View.MeasureSpec.EXACTLY),
+      )
+      sheet.layout(0, 0, WIDTH_PX, HEIGHT_PX)
+      shadowOf(Looper.getMainLooper()).idle()
+      val child = sheet.getSheetChildAt(0)!!
+      val d = sheet.density
+      val expected = (WIDTH_PX - 80 * d) / (WIDTH_PX - 16 * d)
+      assertEquals(expected, child.scaleX, 0.001f)
+      assertEquals(expected, child.scaleY, 0.001f)
+      assertEquals(40 * d, child.left + child.translationX, 0.5f)
+    }
+  }
+
+  @Test
+  fun `the content keeps its scale and origin inside a narrow card`() {
     val detents =
       listOf(
         points(100.0, left = 40.0, right = 40.0),
         points(300.0, left = 8.0, right = 8.0, widest = true),
       )
     withSheet(detents, index = 0) { sheet ->
-      val d = sheet.density
       val content = sheet.getSheetChildAt(0)!!
-      val expected = (WIDTH_PX - 80 * d) / (WIDTH_PX - 16 * d)
+      val expected = 1f
       assertEquals(expected, content.scaleX, 0.001f)
       assertEquals(expected, content.scaleY, 0.001f)
-      assertEquals(40 * d, content.left + content.translationX, 0.5f)
+      assertEquals(0f, content.left + content.translationX, 0.5f)
     }
   }
 
@@ -152,7 +201,7 @@ class BottomSheetHostViewDetentInsetsTest {
     withSheet(detents) { sheet ->
       val d = sheet.density
       val content = sheet.getSheetChildAt(0)!!
-      assertEquals((WIDTH_PX - 128 * d) / (WIDTH_PX - 16 * d), content.scaleY, 0.001f)
+      assertEquals(1f, content.scaleY, 0.001f)
       val middle = WIDTH_PX / 2f
       // In the sheet container's coordinates, which start at the card's top.
       assertTrue(sheet.clip.cardContains(middle, 299 * d))
@@ -170,18 +219,18 @@ class BottomSheetHostViewDetentInsetsTest {
     withSheet(detents, index = 1) { sheet ->
       val content = sheet.getSheetChildAt(0)!!
       assertEquals(1f, content.scaleX, 0.001f)
-      assertEquals(8 * sheet.density, content.left + content.translationX, 0.5f)
+      assertEquals(0f, content.left + content.translationX, 0.5f)
     }
   }
 
   @Test
-  fun `the content follows the detent flagged as widest`() {
-    // Native doesn't pick the widest card itself: JS flags the one it lays the content out against.
+  fun `the widest card flag does not inset the content`() {
+    // The flag must not change the content origin in the Contours fork.
     val detents =
       listOf(points(100.0, left = 8.0), points(300.0, left = 24.0, right = 24.0, widest = true))
     withSheet(detents, index = 1) { sheet ->
       val content = sheet.getSheetChildAt(0)!!
-      assertEquals((24 * sheet.density).toInt(), content.left)
+      assertEquals(0, content.left)
       assertEquals(1f, content.scaleX, 0.001f)
     }
   }
@@ -287,6 +336,7 @@ class BottomSheetHostViewDetentInsetsTest {
     val sheet = BottomSheetHostView(controller.get())
     try {
       sheet.animateIn = false
+      sheet.scaleContent = false
       sheet.addSheetChild(
         View(controller.get()).apply {
           measure(

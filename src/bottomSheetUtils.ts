@@ -345,6 +345,13 @@ export type DetentConfig = Readonly<{
    * card. Ignored at a closed detent.
    */
   insets?: DetentInsets;
+  /** Uniform card corner radius in points. Defaults to surfaceStyle.
+   * Interpolated between open detents; ignored at a closed detent. */
+  borderRadius?: number;
+  /** Overrides borderRadius for both top corners. Defaults to surfaceStyle. */
+  borderTopRadius?: number;
+  /** Overrides borderRadius for both bottom corners. Defaults to surfaceStyle. */
+  borderBottomRadius?: number;
 }>;
 
 /** A modal sheet’s detent with its options. */
@@ -376,6 +383,9 @@ type NormalizedDetent = Readonly<{
   /** Whether this is the widest open card, which content is laid out against. */
   widestCard: boolean;
   scrimOpacity: number;
+  borderRadius: number;
+  borderTopRadius: number;
+  borderBottomRadius: number;
 }>;
 
 /** A closed sheet is fully off-screen, whatever its detent’s insets say. */
@@ -503,6 +513,21 @@ const normalizeDetent = (
   const { kind, value } = parseDetentValue(config.value, index);
   const isClosed = isNormalizedDetentClosed({ kind, value });
   const insets = resolveDetentInsets(config.insets, index, isRTL);
+  for (const key of [
+    'borderRadius',
+    'borderTopRadius',
+    'borderBottomRadius',
+  ] as const) {
+    const radius = config[key];
+    if (radius !== undefined && !isFiniteNonNegative(radius)) {
+      throw invalidDetentOptionError(
+        key,
+        radius,
+        index,
+        'a finite, non-negative number'
+      );
+    }
+  }
   // Only a modal sheet has a scrim, so an inline sheet ignores the option
   // rather than validating it.
   const scrimOpacity =
@@ -522,6 +547,9 @@ const normalizeDetent = (
     ...(isClosed ? CLOSED_INSETS : { ...topInset, ...insets }),
     widestCard: false,
     scrimOpacity,
+    borderRadius: config.borderRadius ?? -1,
+    borderTopRadius: config.borderTopRadius ?? config.borderRadius ?? -1,
+    borderBottomRadius: config.borderBottomRadius ?? config.borderRadius ?? -1,
   };
 };
 

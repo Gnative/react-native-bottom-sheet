@@ -3,6 +3,7 @@ export type CaseKey =
   | 'basic-modal'
   | 'accessible-dismissal'
   | 'surface-style'
+  | 'detent-radii'
   | 'corner-touches'
   | 'detached-sheet'
   | 'lazy-mounted-modal'
@@ -64,6 +65,11 @@ export const DEMO_CASES: DemoCase[] = [
     key: 'surface-style',
     title: 'Surface style (card shape)',
     href: '/surface-style',
+  },
+  {
+    key: 'detent-radii',
+    title: 'Per-detent corner radii',
+    href: '/detent-radii',
   },
   {
     key: 'corner-touches',

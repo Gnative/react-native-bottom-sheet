@@ -25,6 +25,10 @@ type NativeDetent = Readonly<{
   widestCard: boolean;
   // The scrim’s opacity at this detent, in 0-1. Ignored by inline sheets.
   scrimOpacity: CodegenTypes.Double;
+  // -1 inherits surfaceStyle; otherwise a uniform radius in points.
+  borderRadius: CodegenTypes.Double;
+  borderTopRadius: CodegenTypes.Double;
+  borderBottomRadius: CodegenTypes.Double;
 }>;
 
 export interface NativeProps extends ViewProps {
@@ -32,6 +36,7 @@ export interface NativeProps extends ViewProps {
   index: CodegenTypes.Int32;
   animateIn?: CodegenTypes.WithDefault<boolean, true>;
   animateContentHeight?: CodegenTypes.WithDefault<boolean, true>;
+  scaleContent?: CodegenTypes.WithDefault<boolean, true>;
   modal: boolean;
   windowOverlay?: boolean;
   // When the sheet last opened, relative to other sheets (0 until it first

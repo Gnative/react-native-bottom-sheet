@@ -139,16 +139,18 @@ export const DemoScreen = ({
   children,
   sheet,
   scrollableControls = false,
+  backgroundColor = 'white',
 }: {
   title: string;
   children: ReactNode;
   sheet?: ReactNode;
   scrollableControls?: boolean;
+  backgroundColor?: string;
 }) => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'white' }}>
+    <View style={{ flex: 1, backgroundColor }}>
       <View
         style={{
           paddingTop: insets.top + 8,
@@ -156,7 +158,7 @@ export const DemoScreen = ({
           paddingBottom: 12,
           borderBottomWidth: 1,
           borderBottomColor: '#ededed',
-          backgroundColor: 'white',
+          backgroundColor,
           flexDirection: 'row',
           alignItems: 'center',
           gap: 12,
@@ -185,7 +187,7 @@ export const DemoScreen = ({
           paddingHorizontal: 20,
           paddingTop: 16,
           gap: 16,
-          backgroundColor: 'white',
+          backgroundColor,
         }}
       >
         {scrollableControls ? (

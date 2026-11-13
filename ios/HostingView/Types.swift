@@ -15,6 +15,9 @@ struct DetentSpec: Equatable {
   let position: CGFloat
   let programmatic: Bool
   let insets: DetentInsets
+  var borderRadius: CGFloat = -1
+  var borderTopRadius: CGFloat = -1
+  var borderBottomRadius: CGFloat = -1
 }
 
 enum DetentKind {
@@ -28,6 +31,9 @@ struct RawDetentSpec: Equatable {
   let kind: DetentKind
   let programmatic: Bool
   let insets: DetentInsets
+  var borderRadius: CGFloat = -1
+  var borderTopRadius: CGFloat = -1
+  var borderBottomRadius: CGFloat = -1
   /// The widest open card, which the content is laid out against. Flagged in JS,
   /// which lays the content out.
   let widestCard: Bool

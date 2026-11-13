@@ -113,6 +113,9 @@ using namespace facebook::react;
         @"insetBottom": @(detent.insetBottom),
         @"widestCard": @(detent.widestCard),
         @"scrimOpacity": @(detent.scrimOpacity),
+        @"borderRadius": @(detent.borderRadius),
+        @"borderTopRadius": @(detent.borderTopRadius),
+        @"borderBottomRadius": @(detent.borderBottomRadius),
       }];
     }
     [_sheetView setDetents:detentsArray];
@@ -132,6 +135,10 @@ using namespace facebook::react;
 
   if (newViewProps.animateContentHeight != oldViewProps.animateContentHeight) {
     _sheetView.animateContentHeight = newViewProps.animateContentHeight;
+  }
+
+  if (newViewProps.scaleContent != oldViewProps.scaleContent) {
+    _sheetView.scaleContent = newViewProps.scaleContent;
   }
 
   if (newViewProps.modal != oldViewProps.modal) {

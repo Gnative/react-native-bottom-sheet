@@ -127,6 +127,13 @@ public final class BottomSheetHostingView: UIView {
   var targetIndex: Int = 0
   public var animateIn: Bool = true
   public var animateContentHeight: Bool = true
+  public var scaleContent: Bool = true {
+    didSet {
+      guard scaleContent != oldValue else { return }
+      if hasLaidOut { isContentRegionChangePending = true }
+      setNeedsLayout()
+    }
+  }
 
   public let sheetContainer = UIView()
   let clipContainer = CardClipView()
@@ -467,6 +474,9 @@ public final class BottomSheetHostingView: UIView {
           right: inset("insetRight"),
           bottom: inset("insetBottom")
         ),
+        borderRadius: CGFloat(truncating: dict["borderRadius"] as? NSNumber ?? -1),
+        borderTopRadius: CGFloat(truncating: dict["borderTopRadius"] as? NSNumber ?? -1),
+        borderBottomRadius: CGFloat(truncating: dict["borderBottomRadius"] as? NSNumber ?? -1),
         widestCard: widestCard
       )
     }
@@ -489,6 +499,7 @@ public final class BottomSheetHostingView: UIView {
       isContentRegionChangePending = true
     }
     refreshDetentsFromLayout()
+    updateCardShape()
     // Set once the detents are re-resolved, so the scrim isn’t repainted
     // against the previous ones.
     scrimOpacities = entries.map { CGFloat(truncating: $0["scrimOpacity"] as? NSNumber ?? 1) }

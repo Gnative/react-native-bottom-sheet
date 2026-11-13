@@ -11,9 +11,9 @@ extension BottomSheetHostingView {
     return min(max(0, window.safeAreaInsets.top - originYInWindow), bounds.height)
   }
 
-  /// How much the content is scaled for a card this wide: its width over the
-  /// width of the widest card, which the content is laid out against.
+  /// Scale content to fit the card unless the caller opts out.
   func contentScale(forCardWidth width: CGFloat) -> CGFloat {
+    guard scaleContent else { return 1 }
     let widest = bounds.width - widestCardSideGaps
     return widest > 0 ? width / widest : 1
   }
@@ -133,7 +133,7 @@ extension BottomSheetHostingView {
         return nil
       }
       resolvedDetents.append(
-        DetentSpec(position: position, programmatic: spec.programmatic, insets: spec.insets)
+        DetentSpec(position: position, programmatic: spec.programmatic, insets: spec.insets, borderRadius: spec.borderRadius, borderTopRadius: spec.borderTopRadius, borderBottomRadius: spec.borderBottomRadius)
       )
     }
 

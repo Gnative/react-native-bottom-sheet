@@ -15,6 +15,9 @@ export type RawDetent = Readonly<{
   widestCard: boolean;
   /** The scrim’s opacity at this detent, in 0-1. */
   scrimOpacity: number;
+  borderRadius: number;
+  borderTopRadius: number;
+  borderBottomRadius: number;
 }>;
 
 export type ResolvedDetent = Readonly<{
@@ -34,6 +37,7 @@ export type BottomSheetWebConfig = Readonly<{
   index: number;
   animateIn: boolean;
   animateContentHeight: boolean;
+  scaleContent: boolean;
   modal: boolean;
   hasCloseRequestHandler: boolean;
   /** When the sheet last opened, relative to other sheets. */

@@ -17,6 +17,7 @@ export type DetentsHost = {
   readonly hostHeight: number;
   readonly statusBarOverlap: number;
   readonly widestCardGaps: number;
+  readonly config: { scaleContent: boolean } | null;
   lastReportedError: string | null;
   emit(event: (callbacks: BottomSheetWebCallbacks) => void): void;
 };
@@ -98,15 +99,13 @@ export const surfaceOverflow = (
   return tallest - host.hostHeight;
 };
 
-/**
- * How much the content is scaled at a detent: its card's width over the width
- * of the widest card, which the content is laid out against.
- */
 const contentScale = (host: DetentsHost, spec: RawDetent) => {
+  if (host.config?.scaleContent === false) return 1;
   const width = host.elements?.host.clientWidth ?? 0;
   const widest = width - host.widestCardGaps;
-  if (widest <= 0) return 1;
-  return Math.max(0, width - spec.insetLeft - spec.insetRight) / widest;
+  return widest > 0
+    ? Math.max(0, width - spec.insetLeft - spec.insetRight) / widest
+    : 1;
 };
 
 const measureContentHeight = (host: DetentsHost): number | null => {
@@ -255,6 +254,9 @@ export const areRawDetentsEqual = (
       detent.insetLeft === b[index]!.insetLeft &&
       detent.insetRight === b[index]!.insetRight &&
       detent.insetBottom === b[index]!.insetBottom &&
+      detent.borderRadius === b[index]!.borderRadius &&
+      detent.borderTopRadius === b[index]!.borderTopRadius &&
+      detent.borderBottomRadius === b[index]!.borderBottomRadius &&
       detent.widestCard === b[index]!.widestCard
   );
 

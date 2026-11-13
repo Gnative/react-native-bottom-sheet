@@ -130,14 +130,9 @@ export interface BottomSheetProps {
    * below the first open detent the card keeps its shape and slides down
    * through the bottom inset. A closed detent ignores its insets.
    *
-   * Insets never relayout the surface or content. They are laid out against
-   * the widest card, the detent with the tightest side insets, and scaled
-   * uniformly to fit narrower ones, so full-width content and an image surface
-   * always touch the card's edges. A `'content'` detent's card is its scaled
-   * height. `measure` and `measureInWindow` report the scaled position and
-   * size, `windowOverlay` included, except on the web, where React Native
-   * Web's `measure` ignores transforms and only `measureInWindow` follows the
-   * card.
+   * By default, surface and content scale uniformly to fit the card's width.
+   * With scaleContent={false}, content keeps its full host width and original
+   * coordinates instead. Add child padding to keep controls clear of clipping.
    *
    * Space in an inset isn't part of the sheet: touches there reach the scrim or
    * whatever is behind it.
@@ -171,6 +166,11 @@ export interface BottomSheetProps {
    * @default true
    */
   animateContentHeight?: boolean;
+  /** Scale the content and surface to fit per-detent side insets.
+   * Set false to keep full-host coordinates and clip inset edges instead.
+   * @default true
+   */
+  scaleContent?: boolean;
   /**
    * Whether to keep the sheet in the tree only while it is open. The native
    * sheet view and its content mount in the same render that `index` selects an
@@ -281,6 +281,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
     index,
     animateIn = true,
     animateContentHeight = true,
+    scaleContent = true,
     lazy = false,
     onIndexChange,
     onSettle,
@@ -329,12 +330,9 @@ export const BottomSheet = (props: BottomSheetProps) => {
     setIsSheetActive(true);
     setHasOpenedFromClosed(true);
   }
-  // The surface and content are laid out against the widest card, and the
-  // native host scales them down to narrower ones. Stated as start/end because
-  // insets are physical, while left/right may swap under RTL.
   const widestDetent = normalizedDetents.find((detent) => detent.widestCard);
-  const contentLeft = widestDetent?.insetLeft ?? 0;
-  const contentRight = widestDetent?.insetRight ?? 0;
+  const contentLeft = scaleContent ? (widestDetent?.insetLeft ?? 0) : 0;
+  const contentRight = scaleContent ? (widestDetent?.insetRight ?? 0) : 0;
   // When the sheet last opened, relative to other sheets: 0 until it first
   // opens. This includes reopening while it is still closing.
   const [wasSheetClosed, setWasSheetClosed] = useState(isSheetClosed);
@@ -426,6 +424,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
           index={index}
           animateIn={animateIn || (lazy && hasOpenedFromClosed)}
           animateContentHeight={animateContentHeight}
+          scaleContent={scaleContent}
           modal={modal}
           windowOverlay={usesWindowOverlay}
           openOrder={openOrder}

@@ -34,6 +34,10 @@ export default function RootLayout() {
               options={{ title: 'Surface style', headerShown: false }}
             />
             <Stack.Screen
+              name="detent-radii"
+              options={{ title: 'Per-detent corner radii', headerShown: false }}
+            />
+            <Stack.Screen
               name="corner-touches"
               options={{ title: 'Corner touches', headerShown: false }}
             />

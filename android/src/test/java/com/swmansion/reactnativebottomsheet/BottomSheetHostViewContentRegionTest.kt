@@ -89,10 +89,10 @@ class BottomSheetHostViewContentRegionTest {
   }
 
   @Test
-  fun `a narrow tallest card's content region outgrows the sheet`() {
+  fun `a narrow tallest card keeps an unscaled content region`() {
     withSheet(narrowTallest("percentage", 1.0)) { sheet ->
       val d = sheet.density
-      val scale = (WIDTH_PX / d - 2 * NARROW_SIDE) / (WIDTH_PX / d - 2 * WIDE_SIDE)
+      val scale = 1.0
       assertEquals(HEIGHT_PX / d - HEIGHT_PX / d / scale, publishedInset(sheet), 0.001)
     }
   }
@@ -101,7 +101,7 @@ class BottomSheetHostViewContentRegionTest {
   fun `a narrow trailing content detent's region is bounded by the space alone`() {
     withSheet(narrowTallest("content", 0.0)) { sheet ->
       val d = sheet.density
-      val scale = (WIDTH_PX / d - 2 * NARROW_SIDE) / (WIDTH_PX / d - 2 * WIDE_SIDE)
+      val scale = 1.0
       assertEquals(HEIGHT_PX / d - HEIGHT_PX / d / scale, publishedInset(sheet), 0.001)
 
       // The measurement can't feed back: a filling content's marker moves, the region doesn't.
@@ -121,8 +121,8 @@ class BottomSheetHostViewContentRegionTest {
       val d = sheet.density
       val listener = RecordingSheetListener()
       sheet.listener = listener
-      val scale = (WIDTH_PX / d - 2 * NARROW_SIDE) / (WIDTH_PX / d - 2 * WIDE_SIDE)
-      // Scaled, this content fits the sheet, so it must not be cut to the sheet's height first.
+      val scale = 1.0
+      // Unscaled content taller than the host is capped to the available height.
       val measuredDp = HEIGHT_PX / d * 1.1
       val content = RegionContentView(sheet.context)
       sheet.addSheetChild(content, 0)
@@ -138,10 +138,10 @@ class BottomSheetHostViewContentRegionTest {
   }
 
   @Test
-  fun `the surface reaches the card's bottom when scaled`() {
+  fun `the surface fills a narrow card without scaling`() {
     withSheet(narrowTallest("percentage", 1.0)) { sheet ->
       val d = sheet.density
-      val scale = (WIDTH_PX / d - 2 * NARROW_SIDE) / (WIDTH_PX / d - 2 * WIDE_SIDE)
+      val scale = 1.0
       assertEquals(HEIGHT_PX / d / scale - HEIGHT_PX / d, publishedSurfaceOverflow(sheet), 0.001)
     }
   }
@@ -161,7 +161,7 @@ class BottomSheetHostViewContentRegionTest {
       )
     withSheet(detents) { sheet ->
       val d = sheet.density
-      val scale = (WIDTH_PX / d - 2 * NARROW_SIDE) / (WIDTH_PX / d)
+      val scale = 1.0
       val layoutHeight = maxOf(HEIGHT_PX / d, 400.0 / scale)
       assertEquals(layoutHeight - HEIGHT_PX / d, publishedSurfaceOverflow(sheet), 0.001)
     }
@@ -175,7 +175,7 @@ class BottomSheetHostViewContentRegionTest {
       sheet.setIndex(2)
       shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
       val open = wrapper.surfaceOverflows.last()
-      assertTrue(open > 0.0)
+      assertEquals(0.0, open, 0.001)
 
       sheet.setDetents(narrowTallest("points", 300.0))
       assertEquals(open, wrapper.surfaceOverflows.last(), 0.001)
@@ -498,6 +498,7 @@ class BottomSheetHostViewContentRegionTest {
     val sheet = BottomSheetHostView(controller.get())
     try {
       sheet.animateIn = false
+      sheet.scaleContent = false
       sheet.setDetents(detents)
       sheet.setIndex(0)
       controller.get().setContentView(sheet, ViewGroup.LayoutParams(WIDTH_PX, HEIGHT_PX))

@@ -64,6 +64,9 @@ internal class Detents(
             right = inset("insetRight"),
             bottom = inset("insetBottom"),
           ),
+        borderRadius = ((dict["borderRadius"] as? Number)?.toFloat() ?: -1f).let { if (it < 0f) -1f else it * state.density },
+        borderTopRadius = ((dict["borderTopRadius"] as? Number)?.toFloat() ?: -1f).let { if (it < 0f) -1f else it * state.density },
+        borderBottomRadius = ((dict["borderBottomRadius"] as? Number)?.toFloat() ?: -1f).let { if (it < 0f) -1f else it * state.density },
         widestCard = dict["widestCard"] as? Boolean ?: false,
       )
     }
@@ -169,7 +172,7 @@ internal class Detents(
         }
       }
       previousPosition = position
-      DetentSpec(position = position, programmatic = spec.programmatic, insets = spec.insets)
+      DetentSpec(position = position, programmatic = spec.programmatic, insets = spec.insets, borderRadius = spec.borderRadius, borderTopRadius = spec.borderTopRadius, borderBottomRadius = spec.borderBottomRadius)
     }
   }
 

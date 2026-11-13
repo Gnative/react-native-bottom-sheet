@@ -45,6 +45,16 @@
   _impl.animateContentHeight = animateContentHeight;
 }
 
+- (BOOL)scaleContent
+{
+  return _impl.scaleContent;
+}
+
+- (void)setScaleContent:(BOOL)scaleContent
+{
+  _impl.scaleContent = scaleContent;
+}
+
 - (UIView *)sheetContainer
 {
   return _impl.sheetContainer;

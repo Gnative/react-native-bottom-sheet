@@ -100,23 +100,43 @@ extension BottomSheetHostingView {
     return currentTranslationY
   }
 
-  /// How much the card scales the surface and content.
+  /// Content measurement stays unscaled at every detent.
   public var currentContentScale: CGFloat {
     guard hasCardGaps else { return 1 }
     return contentScale(forCardWidth: cardRect(forPosition: currentSheetHeight).width)
   }
 
-  /// The sheet coordinate space's horizontal displacement, which the scale applies
-  /// to as well: it puts the widest card's left edge, scaled, on the card's.
+  /// Insets do not shift content measurement coordinates.
   public var currentContentOffsetX: CGFloat {
-    guard hasCardGaps else { return 0 }
+    guard scaleContent, hasCardGaps else { return 0 }
     let card = cardRect(forPosition: currentSheetHeight)
     let widestLeft = findContentView().map { $0.center.x - $0.bounds.width / 2 } ?? 0
     return card.minX - contentScale(forCardWidth: card.width) * widestLeft
   }
 
   var isCardShaped: Bool {
-    hasCardGaps || cornerRadii.contains { $0 > 0 }
+    hasCardGaps || hasDetentCorners || cornerRadii.contains { $0 > 0 }
+  }
+
+  var hasDetentCorners: Bool { rawDetentSpecs.contains { $0.borderTopRadius >= 0 || $0.borderBottomRadius >= 0 } }
+
+  func cardRadii(forPosition position: CGFloat) -> [CGFloat] {
+    let open = detentSpecs.filter { $0.position > 0 }
+    guard let first = open.first else { return cornerRadii }
+    let radii = { (spec: DetentSpec) in
+      [spec.borderTopRadius, spec.borderTopRadius, spec.borderBottomRadius, spec.borderBottomRadius]
+        .enumerated().map { index, radius in radius < 0 ? self.cornerRadii[index] : radius }
+    }
+    var lower = first
+    for upper in open.dropFirst() {
+      if position <= upper.position {
+        let span = upper.position - lower.position
+        let t = span <= 0 ? 1 : min(1, max(0, (position - lower.position) / span))
+        return zip(radii(lower), radii(upper)).map { $0 + ($1 - $0) * t }
+      }
+      lower = upper
+    }
+    return radii(lower)
   }
 
   /// Moves the sheet and keeps the card in step with it.
@@ -165,11 +185,11 @@ extension BottomSheetHostingView {
   /// sharp. Clip, shadows and hit testing all read this one outline, so they
   /// share the corner curve: continuous corners trace the same curve as
   /// `CALayer.cornerCurve = .continuous`.
-  func cardPath(in cardRect: CGRect, outset: CGFloat = 0) -> CGPath {
+  func cardPath(in cardRect: CGRect, outset: CGFloat = 0, position: CGFloat? = nil) -> CGPath {
     let rect = cardRect.insetBy(dx: -outset, dy: -outset)
     // A negative spread can leave no shape, which then casts no shadow.
     guard !rect.isNull else { return CGMutablePath() }
-    let grown = cornerRadii.map { $0 > 0 ? max(0, $0 + outset) : 0 }
+    let grown = cardRadii(forPosition: position ?? currentSheetHeight).map { $0 > 0 ? max(0, $0 + outset) : 0 }
     // Corner transforms map the top-right corner's local frame (origin at the
     // corner, x leftward-negative along the top edge, y down the right edge)
     // onto each corner, clockwise from the top right.
@@ -206,7 +226,7 @@ extension BottomSheetHostingView {
 
   /// Masks the card's interior out of a shadow: everything the shadow can
   /// reach, minus the card, with an even-odd fill.
-  private func shadowMaskPath(in cardRect: CGRect, for shadow: CardShadow) -> CGPath {
+  private func shadowMaskPath(in cardRect: CGRect, for shadow: CardShadow, position: CGFloat? = nil) -> CGPath {
     // Past three sigma (1.5 blur radii) a Gaussian blur adds nothing visible.
     let reach = 1.5 * shadow.blurRadius + abs(shadow.spreadDistance) + 1
     let path = CGMutablePath()
@@ -216,7 +236,7 @@ extension BottomSheetHostingView {
         .union(cardRect)
         .insetBy(dx: -reach, dy: -reach)
     )
-    path.addPath(cardPath(in: cardRect))
+    path.addPath(cardPath(in: cardRect, position: position))
     return path
   }
 
@@ -239,10 +259,9 @@ extension BottomSheetHostingView {
     CATransaction.commit()
   }
 
-  /// Scales a view (the surface or content) to the card's width and pins its
-  /// top-left corner to the card's. Layer work only: the view keeps its layout.
+  /// Keep full-host child coordinates while the card clip changes.
   private func contentTransform(of contentView: UIView, in rect: CGRect) -> CATransform3D {
-    guard hasCardGaps else { return CATransform3DIdentity }
+    guard scaleContent, hasCardGaps else { return CATransform3DIdentity }
     let scale = contentScale(forCardWidth: rect.width)
     // The layer scales about its center, which Fabric's layout owns.
     let center = contentView.center
@@ -305,7 +324,7 @@ extension BottomSheetHostingView {
   func updateCardShape() {
     let rounded = cornerRadii.filter { $0 > 0 }
     clipContainer.clipsToBounds = isCardShaped
-    if let radius = rounded.first, rounded.allSatisfy({ abs($0 - radius) < 0.01 }) {
+    if !hasDetentCorners, let radius = rounded.first, rounded.allSatisfy({ abs($0 - radius) < 0.01 }) {
       var corners: CACornerMask = []
       if cornerRadii[0] > 0 {
         corners.insert(.layerMinXMinYCorner)
@@ -324,7 +343,7 @@ extension BottomSheetHostingView {
       clipContainer.layer.cornerCurve = cornerCurve
       clipContainer.layer.mask = nil
       cardMask = nil
-    } else if !rounded.isEmpty {
+    } else if hasDetentCorners || !rounded.isEmpty {
       clipContainer.layer.cornerRadius = 0
       let mask = cardMask ?? CAShapeLayer()
       mask.frame = .zero
@@ -368,16 +387,16 @@ extension BottomSheetHostingView {
     cardSettleAnimation = sheetAnimation
     addContentAnimation()
     cardMask?.add(
-      keyframes("path", rects.map { cardPath(in: $0) }),
+      keyframes("path", zip(rects, samples).map { cardPath(in: $0.0, position: sheetContainerHeight - $0.1) }),
       forKey: Self.cardMaskAnimationKey
     )
     for (layer, shadow) in zip(shadowLayers, cardShadows) {
       layer.add(
-        keyframes("shadowPath", rects.map { cardPath(in: $0, outset: shadow.spreadDistance) }),
+        keyframes("shadowPath", zip(rects, samples).map { cardPath(in: $0.0, outset: shadow.spreadDistance, position: sheetContainerHeight - $0.1) }),
         forKey: Self.cardShadowAnimationKey
       )
       layer.mask?.add(
-        keyframes("path", rects.map { shadowMaskPath(in: $0, for: shadow) }),
+        keyframes("path", zip(rects, samples).map { shadowMaskPath(in: $0.0, for: shadow, position: sheetContainerHeight - $0.1) }),
         forKey: Self.cardShadowMaskAnimationKey
       )
     }

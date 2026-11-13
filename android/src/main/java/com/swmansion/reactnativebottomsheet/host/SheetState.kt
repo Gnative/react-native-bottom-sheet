@@ -40,6 +40,7 @@ internal class SheetState(val hostView: ViewGroup, val sheetContainer: BottomShe
   var detentSpecs: List<DetentSpec> = emptyList()
   var targetIndex: Int = 0
   var animateContentHeight: Boolean = true
+  var scaleContent: Boolean = true
   var modal: Boolean = false
 
   var scrollExpandCoordination: Int = ScrollCoordinationLevel.HANDOFF.value
@@ -89,9 +90,9 @@ internal class SheetState(val hostView: ViewGroup, val sheetContainer: BottomShe
   val isTargetingClosedDetent: Boolean
     get() = detentSpecs.getOrNull(targetIndex)?.position == 0f
 
-  // How much the content is scaled at a detent: its card's width over the width of the widest card,
-  // which the content is laid out against.
+  // Preserve upstream card scaling unless the caller opts out.
   fun contentScale(insets: DetentInsets): Float {
+    if (!scaleContent) return 1f
     val widest = width - widestCardInsets.left - widestCardInsets.right
     if (widest <= 0f) return 1f
     return (width - insets.left - insets.right).coerceAtLeast(0f) / widest

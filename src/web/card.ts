@@ -81,18 +81,53 @@ export class SheetCard {
       insetRight: right,
       insetBottom: bottom,
     } = this.cardInsets(position);
+    const open = hostState.detents
+      .map((detent, index) => ({
+        position: detent.position,
+        top: hostState.rawDetents[index]?.borderTopRadius ?? -1,
+        bottom: hostState.rawDetents[index]?.borderBottomRadius ?? -1,
+      }))
+      .filter((detent) => detent.position > 0);
+    let lower = open[0];
+    let radii = [...hostState.config.cornerRadii];
+    const resolve = (detent: { top: number; bottom: number }) =>
+      [detent.top, detent.top, detent.bottom, detent.bottom].map(
+        (radius, index) =>
+          radius < 0 ? (hostState.config!.cornerRadii[index] ?? 0) : radius
+      );
+    if (lower !== undefined) {
+      radii = resolve(lower);
+      for (const upper of open.slice(1)) {
+        if (position <= upper.position) {
+          const span = upper.position - lower.position;
+          const t =
+            span <= 0 ? 1 : clamp((position - lower.position) / span, 0, 1);
+          const from = resolve(lower);
+          const to = resolve(upper);
+          radii = from.map((value, index) => value + (to[index]! - value) * t);
+          break;
+        }
+        lower = upper;
+        radii = resolve(lower);
+      }
+    }
+    const corners = radii.map((radius) => `${radius}px`).join(' ');
+    if (corners !== this.cardCorners) {
+      this.cardCorners = corners;
+      this.appliedCardHeight = NaN;
+      shadow.style.borderRadius = corners;
+    }
+    this.isCardRounded = radii.some((radius) => radius > 0);
     const cardHeight = clamp(position - bottom, 0, hostState.hostHeight);
     const clipInset = hostState.hostHeight - cardHeight;
 
-    // Scale the surface and content to the card's width, with their top-left
-    // corners on the card's. The transform origin is the box's, which starts at
-    // the container's left, so the layout margin scales along. Ahead of the
-    // check below: the widest card can change while this card stays the same.
+    // Insets affect the clip only; content retains host coordinates.
     const widest = host.clientWidth - hostState.widestCardGaps;
     const scale =
       widest > 0 ? Math.max(0, host.clientWidth - left - right) / widest : 1;
     const transform =
-      scale === 1 && left === hostState.widestCardLeft
+      hostState.config.scaleContent === false ||
+      (scale === 1 && left === hostState.widestCardLeft)
         ? ''
         : `translateX(${left - scale * hostState.widestCardLeft}px) scale(${scale})`;
     if (transform !== this.appliedContentTransform) {
@@ -135,6 +170,7 @@ export class SheetCard {
     const position = this.currentPosition();
     const { insetLeft, insetRight, insetBottom } = this.cardInsets(position);
     const height = clamp(position - insetBottom, 0, hostState.hostHeight);
+    if (hostState.config?.scaleContent === false) return height;
     const width = hostState.elements?.host.clientWidth ?? 0;
     const widest = width - hostState.widestCardGaps;
     const scale =

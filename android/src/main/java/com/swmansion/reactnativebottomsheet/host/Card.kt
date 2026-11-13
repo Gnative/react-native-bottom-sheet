@@ -24,11 +24,12 @@ internal class Card(
   var shadowContentOffsetX = 0f
   var shadowContentScale = 1f
 
+  private var baseCornerRadii = FloatArray(4)
+
   /** Physical corner radii of the card in dp: top-left, top-right, bottom-right, bottom-left. */
   fun setSurfaceCornerRadii(values: List<Float>) {
     val radii = FloatArray(4) { (values.getOrNull(it) ?: 0f).coerceAtLeast(0f) * state.density }
-    clipContainer.setCornerRadii(radii)
-    for (shadowView in shadowViews) shadowView.setCornerRadii(radii)
+    baseCornerRadii = radii
     updateCardGeometry()
   }
 
@@ -86,6 +87,9 @@ internal class Card(
    */
   fun updateCardGeometry() {
     val position = currentPosition()
+    val radii = cardRadiiAt(position)
+    clipContainer.setCornerRadii(radii)
+    for (shadowView in shadowViews) shadowView.setCornerRadii(radii)
     val insets = cardInsetsAt(position)
     val left = insets.left
     val right = (state.sheetContainer.width - insets.right).coerceAtLeast(left)
@@ -93,6 +97,27 @@ internal class Card(
     clipContainer.setCard(left, 0f, right, bottom)
     updateContentTransform(left, right)
     updateCardShadows(left, right, bottom)
+  }
+
+  private fun cardRadiiAt(position: Float): FloatArray {
+    val open = state.detentSpecs.filter { it.position > 0f }
+    var lower = open.firstOrNull() ?: return baseCornerRadii
+    fun radii(spec: DetentSpec) =
+      FloatArray(4) { index ->
+        val radius = if (index < 2) spec.borderTopRadius else spec.borderBottomRadius
+        if (radius < 0f) baseCornerRadii[index] else radius
+      }
+    for (upper in open.drop(1)) {
+      if (position <= upper.position) {
+        val span = upper.position - lower.position
+        val t = if (span <= 0f) 1f else ((position - lower.position) / span).coerceIn(0f, 1f)
+        val from = radii(lower)
+        val to = radii(upper)
+        return FloatArray(4) { from[it] + (to[it] - from[it]) * t }
+      }
+      lower = upper
+    }
+    return radii(lower)
   }
 
   private fun currentPosition(): Float =
@@ -114,8 +139,14 @@ internal class Card(
     return if (scale > 0f) height / scale else height
   }
 
-  /** Scales the surface and content to the card's width and pins them to its top-left corner. */
+  /** Keep child coordinates stable while the card clip follows its insets. */
   private fun updateContentTransform(cardLeft: Float, cardRight: Float) {
+    if (!state.scaleContent) {
+      for (i in 0 until clipContainer.childCount) resetContentTransform(clipContainer.getChildAt(i))
+      shadowContentScale = 1f
+      shadowContentOffsetX = 0f
+      return
+    }
     val widest =
       state.sheetContainer.width - state.widestCardInsets.left - state.widestCardInsets.right
     val scale = if (widest > 0f) (cardRight - cardLeft) / widest else 1f
@@ -200,7 +231,7 @@ internal class Card(
     for (shadowView in shadowViews) shadowView.layout(0, 0, containerWidth, containerHeight)
     clipContainer.layout(0, 0, containerWidth, containerHeight)
     // Fabric only measures the children, so the host applies the content's Yoga margin.
-    val contentLeft = state.widestCardInsets.left.toInt()
+    val contentLeft = if (state.scaleContent) state.widestCardInsets.left.toInt() else 0
     for (i in 0 until clipContainer.childCount) {
       val child = clipContainer.getChildAt(i)
       child.layout(contentLeft, 0, contentLeft + child.measuredWidth, child.measuredHeight)
