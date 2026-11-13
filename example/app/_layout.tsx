@@ -38,6 +38,10 @@ export default function RootLayout() {
               options={{ title: 'Per-detent corner radii', headerShown: false }}
             />
             <Stack.Screen
+              name="fullscreen-detents"
+              options={{ title: 'Fullscreen detents', headerShown: false }}
+            />
+            <Stack.Screen
               name="corner-touches"
               options={{ title: 'Corner touches', headerShown: false }}
             />

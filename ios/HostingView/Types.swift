@@ -23,6 +23,7 @@ struct DetentSpec: Equatable {
 enum DetentKind {
   case points
   case percentage
+  case fullscreen
   case content
 }
 

@@ -83,7 +83,8 @@ internal class ContentRegion(
    */
   private fun contentRegionHeightPx(): Float {
     val tallest = state.rawDetentSpecs.lastOrNull() ?: return state.height.toFloat()
-    val cardHeight = cardHeightBound(tallest)
+    val height = cardHeightBound(tallest)
+    val cardHeight = (height - state.contentInsetAt(height + tallest.insets.bottom)).coerceAtLeast(0f)
     val scale = state.contentScale(tallest.insets)
     return if (scale > 0f) cardHeight / scale else cardHeight
   }
@@ -97,7 +98,7 @@ internal class ContentRegion(
       when (spec.kind) {
         DetentKind.POINTS -> spec.value
         DetentKind.PERCENTAGE -> available * spec.value
-        DetentKind.CONTENT -> available
+        DetentKind.FULLSCREEN, DetentKind.CONTENT -> available
       }
     return bound.coerceIn(0f, available)
   }
@@ -283,7 +284,7 @@ internal class ContentRegion(
     // translation. The content-region inset shrinks
     // the content via Yoga BOTTOM padding, keeping the Yoga origin at zero, so
     // the full displacement is carried here.
-    val offsetY = (translationY / state.density).toDouble()
+    val offsetY = ((translationY + state.contentInsetAt(state.height - translationY)) / state.density).toDouble()
     lastShadowOffsetY = offsetY.toFloat()
     pushStateSnapshot()
   }

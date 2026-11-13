@@ -38,6 +38,33 @@ class BottomSheetHostViewContentRegionTest {
   }
 
   @Test
+  fun `fullscreen reserves content space while the surface reaches the host top`() {
+    withSheet(listOf(points(0.0), mapOf("value" to 1.0, "kind" to "fullscreen"))) { sheet ->
+      sheet.contentTopInset = 59.0
+      val surface = BottomSheetSurfaceView(sheet.context)
+      sheet.addSheetChild(surface, 0)
+      val content = RegionContentView(sheet.context)
+      sheet.addSheetChild(content, 1)
+      content.applyFabricMeasure(WIDTH_PX, HEIGHT_PX, fillsRegion = true)
+      layout(sheet)
+      sheet.stateWrapper = InsetRecordingStateWrapper()
+      sheet.commitContentRegion(HEIGHT_PX / sheet.density - 59.0)
+      sheet.setIndex(1)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      assertEquals(59.0, publishedInset(sheet), 0.001)
+      assertEquals(0f, surface.translationY, 0.01f)
+      assertEquals((59 * sheet.density).toFloat(), content.translationY, 0.5f)
+      sheet.contentTopInsetOffset = -16.0
+      layout(sheet)
+      sheet.commitContentRegion(HEIGHT_PX / sheet.density - 43.0)
+      shadowOf(Looper.getMainLooper()).idle()
+      assertEquals(43.0, publishedInset(sheet), 0.001)
+      assertEquals(0f, surface.translationY, 0.01f)
+      assertEquals((43 * sheet.density).toFloat(), content.translationY, 0.5f)
+    }
+  }
+
+  @Test
   fun `fixed tallest detent bounds the content region`() {
     withSheet(listOf(points(0.0), points(300.0))) { sheet ->
       assertEquals(maxOf(0.0, HEIGHT_PX / sheet.density - 300.0), publishedInset(sheet), 0.001)

@@ -3,6 +3,7 @@ package com.swmansion.reactnativebottomsheet.host
 internal enum class DetentKind {
   POINTS,
   PERCENTAGE,
+  FULLSCREEN,
   CONTENT,
 }
 

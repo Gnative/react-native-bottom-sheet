@@ -17,9 +17,28 @@ export type DetentsHost = {
   readonly hostHeight: number;
   readonly statusBarOverlap: number;
   readonly widestCardGaps: number;
-  readonly config: { scaleContent: boolean } | null;
+  readonly config: {
+    scaleContent: boolean;
+    contentTopInset: number;
+    contentTopInsetOffset: number;
+  } | null;
   lastReportedError: string | null;
   emit(event: (callbacks: BottomSheetWebCallbacks) => void): void;
+};
+
+/** Content-only offset in native host coordinates, never applied to the surface. */
+export const contentTopInsetAt = (
+  host: Pick<DetentsHost, 'config' | 'statusBarOverlap' | 'hostHeight'>,
+  position: number
+) => {
+  const inset = host.config?.contentTopInset ?? 0;
+  const base = inset < 0 ? host.statusBarOverlap : inset;
+  const boundary = clamp(
+    base + (host.config?.contentTopInsetOffset ?? 0),
+    0,
+    host.hostHeight
+  );
+  return Math.max(0, boundary - (host.hostHeight - position));
 };
 
 /**
@@ -53,6 +72,9 @@ const cardHeightBound = (host: DetentsHost, spec: RawDetent) => {
     case 'points':
       bound = spec.value;
       break;
+    case 'fullscreen':
+      bound = available;
+      break;
     case 'percentage':
       bound = available * spec.value;
       break;
@@ -70,7 +92,11 @@ const cardHeightBound = (host: DetentsHost, spec: RawDetent) => {
 export const contentRegionHeight = (host: DetentsHost) => {
   const tallest = host.rawDetents[host.rawDetents.length - 1];
   if (tallest === undefined) return host.hostHeight;
-  const height = cardHeightBound(host, tallest);
+  const bound = cardHeightBound(host, tallest);
+  const height = Math.max(
+    0,
+    bound - contentTopInsetAt(host, bound + tallest.insetBottom)
+  );
   const scale = contentScale(host, tallest);
   return scale > 0 ? height / scale : height;
 };
@@ -149,6 +175,9 @@ export const resolveDetentSpecs = (
     switch (spec.kind) {
       case 'points':
         height = spec.value;
+        break;
+      case 'fullscreen':
+        height = available;
         break;
       case 'percentage':
         height = available * spec.value;

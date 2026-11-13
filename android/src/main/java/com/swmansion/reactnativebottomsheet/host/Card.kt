@@ -4,6 +4,7 @@ import android.view.View
 import com.swmansion.reactnativebottomsheet.BottomSheetCardClipLayout
 import com.swmansion.reactnativebottomsheet.BottomSheetCardShadowView
 import com.swmansion.reactnativebottomsheet.CardShadow
+import com.swmansion.reactnativebottomsheet.BottomSheetSurfaceView
 import kotlin.math.round
 
 private val NO_INSETS = DetentInsets()
@@ -142,7 +143,13 @@ internal class Card(
   /** Keep child coordinates stable while the card clip follows its insets. */
   private fun updateContentTransform(cardLeft: Float, cardRight: Float) {
     if (!state.scaleContent) {
-      for (i in 0 until clipContainer.childCount) resetContentTransform(clipContainer.getChildAt(i))
+      for (i in 0 until clipContainer.childCount) {
+        val child = clipContainer.getChildAt(i)
+        resetContentTransform(child)
+        child.translationY =
+          if (child is BottomSheetSurfaceView) 0f
+          else state.contentInsetAt(state.height - state.sheetContainer.translationY)
+      }
       shadowContentScale = 1f
       shadowContentOffsetX = 0f
       return
@@ -157,6 +164,9 @@ internal class Card(
       child.scaleX = scale
       child.scaleY = scale
       child.translationX = cardLeft - child.left
+      child.translationY =
+          if (child is BottomSheetSurfaceView) 0f
+          else state.contentInsetAt(state.height - state.sheetContainer.translationY)
     }
     shadowContentScale = scale
     shadowContentOffsetX = cardLeft - scale * state.widestCardInsets.left
@@ -167,6 +177,7 @@ internal class Card(
     view.scaleX = 1f
     view.scaleY = 1f
     view.translationX = 0f
+    view.translationY = 0f
   }
 
   private fun updateCardShadows(cardLeft: Float, cardRight: Float, cardBottom: Float) {

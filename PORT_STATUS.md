@@ -35,9 +35,9 @@ updated, but the test run failed in example settings during Expo React Native
 autolinking before compiling this library. Full native builds and device
 verification remain outstanding.
 
-This is the first implementation step. Fullscreen detents and navigation
-stability from the old Contours branch still need porting and verification. Do
-not switch the app or publish this branch as a complete replacement yet.
+Navigation-transition stability and opening/closing geometry from the old
+Contours branch still need verification/porting. Do not publish this branch as a
+complete replacement before device regression testing.
 
 Top/bottom overrides take precedence over `borderRadius`; omitted values inherit
 the corresponding corners from `surfaceStyle`. Zero explicitly squares that
@@ -56,3 +56,17 @@ settling. Direct and nested Android drag paths share a guarded event pair. The
 snap-callback demo logs both events. Seven focused web lifecycle tests pass;
 Android direct-drag, cancellation, and nested-handoff tests were added but
 native execution remains unverified.
+
+Fullscreen detents now bypass the normal top cap. `fullscreenTopOffset` defaults
+to 0. `contentTopInset="safeArea"` protects only content; the signed
+`contentTopInsetOffset` can subtract handle height to align the area below it.
+The content viewport and measurement metadata account for the live native
+offset. The dedicated fullscreen demo supports inline/modal/window-overlay
+presentation.
+
+Fullscreen validation: the iOS simulator example build succeeded. Library and
+fullscreen-demo typechecks, lint, Bob build, Fabric codegen and all 23 web tests
+passed. Handle compensation is enabled by default in the demo and can be
+toggled. Android verification requires Gradle dependencies not present in the
+offline cache. Visual device checks remain outstanding, including scrolling,
+rotation and presentation/dismissal transitions.

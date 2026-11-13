@@ -129,6 +129,23 @@ public final class BottomSheetHostingView: UIView {
   var targetIndex: Int = 0
   public var animateIn: Bool = true
   public var animateContentHeight: Bool = true
+  /// -1 reads the actual host window safe area, otherwise a host-coordinate boundary.
+  public var contentTopInsetOffset: CGFloat = 0 {
+    didSet {
+      guard contentTopInsetOffset != oldValue else { return }
+      if hasLaidOut { isContentRegionChangePending = true }
+      contentAnimationLayouts = []
+      setNeedsLayout()
+    }
+  }
+  public var contentTopInset: CGFloat = 0 {
+    didSet {
+      guard contentTopInset != oldValue else { return }
+      if hasLaidOut { isContentRegionChangePending = true }
+      contentAnimationLayouts = []
+      setNeedsLayout()
+    }
+  }
   public var scaleContent: Bool = true {
     didSet {
       guard scaleContent != oldValue else { return }
@@ -457,6 +474,8 @@ public final class BottomSheetHostingView: UIView {
       switch kindString {
       case "content":
         kind = .content
+      case "fullscreen":
+        kind = .fullscreen
       case "percentage":
         kind = .percentage
       default:

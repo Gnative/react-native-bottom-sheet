@@ -45,6 +45,26 @@
   _impl.animateContentHeight = animateContentHeight;
 }
 
+- (CGFloat)contentTopInsetOffset
+{
+  return _impl.contentTopInsetOffset;
+}
+
+- (void)setContentTopInsetOffset:(CGFloat)contentTopInsetOffset
+{
+  _impl.contentTopInsetOffset = contentTopInsetOffset;
+}
+
+- (CGFloat)contentTopInset
+{
+  return _impl.contentTopInset;
+}
+
+- (void)setContentTopInset:(CGFloat)contentTopInset
+{
+  _impl.contentTopInset = contentTopInset;
+}
+
 - (BOOL)scaleContent
 {
   return _impl.scaleContent;

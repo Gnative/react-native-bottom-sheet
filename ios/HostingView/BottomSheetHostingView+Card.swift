@@ -97,7 +97,7 @@ extension BottomSheetHostingView {
     // translation. The content-region inset shrinks
     // the content via Yoga BOTTOM padding, keeping the Yoga origin at zero, so
     // the full displacement is carried here.
-    return currentTranslationY
+    return currentTranslationY + contentInset(forPosition: currentSheetHeight)
   }
 
   /// Content measurement stays unscaled at every detent.
@@ -254,20 +254,21 @@ extension BottomSheetHostingView {
       (layer.mask as? CAShapeLayer)?.path = shadowMaskPath(in: rect, for: shadow)
     }
     for view in clipContainer.subviews {
-      view.layer.transform = contentTransform(of: view, in: rect)
+      view.layer.transform = contentTransform(of: view, in: rect, position: position)
     }
     CATransaction.commit()
   }
 
   /// Keep full-host child coordinates while the card clip changes.
-  private func contentTransform(of contentView: UIView, in rect: CGRect) -> CATransform3D {
-    guard scaleContent, hasCardGaps else { return CATransform3DIdentity }
+  private func contentTransform(of contentView: UIView, in rect: CGRect, position: CGFloat) -> CATransform3D {
+    let top = contentView === surfaceView ? 0 : contentInset(forPosition: position)
+    guard scaleContent, hasCardGaps else { return CATransform3DMakeTranslation(0, top, 0) }
     let scale = contentScale(forCardWidth: rect.width)
     // The layer scales about its center, which Fabric's layout owns.
     let center = contentView.center
     let size = contentView.bounds.size
     let dx = rect.minX - (center.x - scale * size.width / 2)
-    let dy = rect.minY - (center.y - scale * size.height / 2)
+    let dy = rect.minY - (center.y - scale * size.height / 2) + top
     return CATransform3DConcat(
       CATransform3DMakeScale(scale, scale, 1),
       CATransform3DMakeTranslation(dx, dy, 0)
@@ -366,7 +367,7 @@ extension BottomSheetHostingView {
   func addCardAnimations(matching sheetAnimation: CAKeyframeAnimation) {
     // An unclipped card without shadows draws nothing that follows its
     // geometry; the model geometry is enough.
-    guard isCardShaped || !cardShadows.isEmpty else { return }
+    guard isCardShaped || !cardShadows.isEmpty || contentTopInset != 0 || contentTopInsetOffset != 0 else { return }
     let samples = (sheetAnimation.values ?? []).compactMap {
       ($0 as? CGFloat) ?? ($0 as? NSNumber).map { CGFloat(truncating: $0) }
     }
@@ -406,7 +407,7 @@ extension BottomSheetHostingView {
   /// replaces them: the same `beginTime` keeps them on the settle's clock, so
   /// nothing visibly restarts.
   func addContentAnimation() {
-    guard hasCardGaps, let sheetAnimation = cardSettleAnimation else { return }
+    guard hasCardGaps || contentTopInset != 0 || contentTopInsetOffset != 0, let sheetAnimation = cardSettleAnimation else { return }
     let samples = (sheetAnimation.values ?? []).compactMap {
       ($0 as? CGFloat) ?? ($0 as? NSNumber).map { CGFloat(truncating: $0) }
     }
@@ -416,7 +417,7 @@ extension BottomSheetHostingView {
       view.layer.add(
         Self.cardKeyframes(
           "transform",
-          rects.map { NSValue(caTransform3D: contentTransform(of: view, in: $0)) },
+          zip(rects, samples).map { NSValue(caTransform3D: contentTransform(of: view, in: $0.0, position: sheetContainerHeight - $0.1)) },
           matching: sheetAnimation
         ),
         forKey: Self.cardContentAnimationKey

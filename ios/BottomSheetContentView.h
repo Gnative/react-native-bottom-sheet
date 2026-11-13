@@ -31,6 +31,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) BOOL animateIn;
 @property (nonatomic) BOOL animateContentHeight;
 @property (nonatomic) BOOL scaleContent;
+@property (nonatomic) CGFloat contentTopInset;
+@property (nonatomic) CGFloat contentTopInsetOffset;
 @property (nonatomic) BOOL modal;
 @property (nonatomic) NSInteger scrollExpandCoordination;
 @property (nonatomic) NSInteger scrollCollapseCoordination;

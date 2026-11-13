@@ -38,6 +38,8 @@ export type BottomSheetWebConfig = Readonly<{
   animateIn: boolean;
   animateContentHeight: boolean;
   scaleContent: boolean;
+  contentTopInset: number;
+  contentTopInsetOffset: number;
   modal: boolean;
   hasCloseRequestHandler: boolean;
   /** When the sheet last opened, relative to other sheets. */

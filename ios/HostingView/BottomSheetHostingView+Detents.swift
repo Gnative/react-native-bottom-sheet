@@ -5,10 +5,17 @@ extension BottomSheetHostingView {
   /// inset that actually overlaps this view. Measured from real window geometry
   /// in every mode — inline, portal, and overlay — so no JS-estimated dimensions
   /// are involved. Before the view is in a window, nothing overlaps it.
-  private var statusBarOverlap: CGFloat {
+  var statusBarOverlap: CGFloat {
     guard let window else { return 0 }
     let originYInWindow = convert(CGPoint.zero, to: window).y
     return min(max(0, window.safeAreaInsets.top - originYInWindow), bounds.height)
+  }
+
+  /// Live content-only offset, in the same host coordinate system as the sheet.
+  func contentInset(forPosition position: CGFloat) -> CGFloat {
+    let base = contentTopInset < 0 ? statusBarOverlap : contentTopInset
+    let boundary = min(bounds.height, max(0, base + contentTopInsetOffset))
+    return max(0, boundary - (sheetContainerHeight - position))
   }
 
   /// Scale content to fit the card unless the caller opts out.
@@ -32,7 +39,8 @@ extension BottomSheetHostingView {
   /// detent: a narrow card's region can outgrow the sheet's node.
   private var contentRegionHeight: CGFloat {
     guard let tallest = rawDetentSpecs.last else { return bounds.height }
-    let height = cardHeightBound(for: tallest)
+    let cardHeight = cardHeightBound(for: tallest)
+    let height = max(0, cardHeight - contentInset(forPosition: cardHeight + tallest.insets.bottom))
     let scale = contentScale(for: tallest.insets)
     return scale > 0 ? height / scale : height
   }
@@ -48,7 +56,7 @@ extension BottomSheetHostingView {
       bound = spec.value
     case .percentage:
       bound = available * spec.value
-    case .content:
+    case .content, .fullscreen:
       bound = available
     }
     return min(max(0, bound), available)
@@ -58,7 +66,7 @@ extension BottomSheetHostingView {
   /// detent's top and bottom insets. Percentages resolve against it, so `100%`
   /// fits.
   private func availableCardHeight(for spec: RawDetentSpec) -> CGFloat {
-    max(0, bounds.height - (spec.insets.top ?? statusBarOverlap) - spec.insets.bottom)
+    max(0, bounds.height - (spec.insets.top ?? (spec.kind == .fullscreen ? 0 : statusBarOverlap)) - spec.insets.bottom)
   }
 
   /// The natively measured inset of the content region: the gap between the
@@ -116,6 +124,8 @@ extension BottomSheetHostingView {
         height = spec.value
       case .percentage:
         height = available * spec.value
+      case .fullscreen:
+        height = available
       case .content:
         height =
           measuredContentHeight.map { $0 * contentScale(for: spec.insets) }
@@ -153,6 +163,8 @@ extension BottomSheetHostingView {
         height = spec.value
       case .percentage:
         height = available * spec.value
+      case .fullscreen:
+        height = available
       case .content:
         continue
       }
@@ -384,7 +396,7 @@ extension BottomSheetHostingView {
       return false
     }
     switch rawDetentSpecs[index].kind {
-    case .points, .percentage:
+    case .points, .percentage, .fullscreen:
       return false
     case .content:
       return validContentHeight == nil

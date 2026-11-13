@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 
-import { firstOpenPosition } from './detents';
+import { contentTopInsetAt, firstOpenPosition } from './detents';
 import { clamp, processedColorToCss } from './dom';
 import type {
   BottomSheetWebConfig,
@@ -14,6 +14,7 @@ export type CardHost = {
   readonly elements: BottomSheetWebElements | null;
   readonly config: BottomSheetWebConfig | null;
   readonly hostHeight: number;
+  readonly statusBarOverlap: number;
   readonly translateY: number;
   readonly detents: ResolvedDetent[];
   readonly rawDetents: ReadonlyArray<RawDetent>;
@@ -130,10 +131,17 @@ export class SheetCard {
       (scale === 1 && left === hostState.widestCardLeft)
         ? ''
         : `translateX(${left - scale * hostState.widestCardLeft}px) scale(${scale})`;
-    if (transform !== this.appliedContentTransform) {
-      this.appliedContentTransform = transform;
+    const top = contentTopInsetAt(
+      hostState,
+      hostState.hostHeight - hostState.translateY
+    );
+    const contentTransform =
+      top > 0 ? `translateY(${top}px) ${transform}`.trim() : transform;
+    const transformKey = `${transform}|${contentTransform}`;
+    if (transformKey !== this.appliedContentTransform) {
+      this.appliedContentTransform = transformKey;
       surface.style.transform = transform;
-      content.style.transform = transform;
+      content.style.transform = contentTransform;
     }
 
     if (

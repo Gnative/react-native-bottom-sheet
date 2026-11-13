@@ -21,6 +21,7 @@ import {
   isNormalizedDetentClosed,
   type ModalDetent,
   normalizeDetents,
+  resolveContentTopInset,
   resolveSurfaceStyle,
   type SurfaceStyle,
   validateIndex,
@@ -108,7 +109,9 @@ export interface BottomSheetProps {
   /** Additional style applied to the native sheet host view. */
   style?: StyleProp<ViewStyle>;
   /**
-   * Snap points for the sheet, in ascending order by position. Defaults to
+   * Snap points for the sheet, in ascending order by position. 'fullscreen'
+   * reaches the host top minus fullscreenTopOffset, independently of topInset.
+   * Defaults to
    * `[0, 'content']` and must contain at least one value. Numbers must be finite
    * and non-negative. Percentage strings must be unsigned values from `0%`
    * through `100%` and resolve against the native usable height. Fixed detents
@@ -147,6 +150,16 @@ export interface BottomSheetProps {
    * @default The part of the status bar that overlaps the host.
    */
   topInset?: number;
+  /** Top offset of fullscreen surfaces within the native host. Default 0. */
+  fullscreenTopOffset?: number;
+  /** Keep the content top below this host-coordinate boundary. 'safeArea'
+   * reads the actual host window's safe area. Does not inset the surface.
+   * @default 0
+   */
+  contentTopInset?: number | 'safeArea';
+  /** Signed adjustment to the content boundary. Use -handleHeight to align
+   * the area below a handle with the safe area. Default 0. */
+  contentTopInsetOffset?: number;
   /**
    * Finite, zero-based integer in `0..(detents.length - 1)`. When shortening
    * `detents`, update `index` to remain in range in the same render.
@@ -282,6 +295,9 @@ export const BottomSheet = (props: BottomSheetProps) => {
     style,
     detents = [0, 'content'],
     topInset,
+    fullscreenTopOffset = 0,
+    contentTopInset = 0,
+    contentTopInsetOffset = 0,
     index,
     animateIn = true,
     animateContentHeight = true,
@@ -321,7 +337,17 @@ export const BottomSheet = (props: BottomSheetProps) => {
   validateIndex(index, detents.length);
   validateSettleDuration(settleDuration);
   const isRTL = isLayoutRTL();
-  const normalizedDetents = normalizeDetents(detents, topInset, modal, isRTL);
+  const normalizedDetents = normalizeDetents(
+    detents,
+    topInset,
+    modal,
+    isRTL,
+    fullscreenTopOffset
+  );
+  const nativeContentTopInset = resolveContentTopInset(
+    contentTopInset,
+    contentTopInsetOffset
+  );
 
   const selectedNormalizedDetent = normalizedDetents[index]!;
   const isSheetClosed = isNormalizedDetentClosed(selectedNormalizedDetent);
@@ -431,6 +457,8 @@ export const BottomSheet = (props: BottomSheetProps) => {
           animateIn={animateIn || (lazy && hasOpenedFromClosed)}
           animateContentHeight={animateContentHeight}
           scaleContent={scaleContent}
+          contentTopInset={nativeContentTopInset}
+          contentTopInsetOffset={contentTopInsetOffset}
           modal={modal}
           windowOverlay={usesWindowOverlay}
           openOrder={openOrder}

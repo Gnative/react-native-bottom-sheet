@@ -4,6 +4,7 @@ export type CaseKey =
   | 'accessible-dismissal'
   | 'surface-style'
   | 'detent-radii'
+  | 'fullscreen-detents'
   | 'corner-touches'
   | 'detached-sheet'
   | 'lazy-mounted-modal'
@@ -70,6 +71,11 @@ export const DEMO_CASES: DemoCase[] = [
     key: 'detent-radii',
     title: 'Per-detent corner radii',
     href: '/detent-radii',
+  },
+  {
+    key: 'fullscreen-detents',
+    title: 'Fullscreen surface and safe content',
+    href: '/fullscreen-detents',
   },
   {
     key: 'corner-touches',

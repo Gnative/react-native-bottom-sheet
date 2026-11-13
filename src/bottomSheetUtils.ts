@@ -301,9 +301,10 @@ export const resolveSurfaceStyle = (
 
 /**
  * A finite, non-negative height in points, an unsigned percentage from `0%`
- * through `100%`, or `'content'` for the measured content height.
+ * through `100%`, `'content'` for measured height, or `'fullscreen'` for
+ * the full native host height, bypassing the ordinary top inset.
  */
-export type DetentValue = number | `${number}%` | 'content';
+export type DetentValue = number | `${number}%` | 'content' | 'fullscreen';
 
 /**
  * The space kept around the card at a detent, in points. All sides default
@@ -373,7 +374,7 @@ export type ModalDetent = DetentValue | ModalDetentConfig;
 
 type NormalizedDetent = Readonly<{
   value: number;
-  kind: 'points' | 'percentage' | 'content';
+  kind: 'points' | 'percentage' | 'content' | 'fullscreen';
   programmatic: boolean;
   usesStatusBarTopInset: boolean;
   insetTop: number;
@@ -491,6 +492,9 @@ const parseDetentValue = (value: DetentValue, index: number) => {
     }
     return { kind: 'points' as const, value };
   }
+  if (value === 'fullscreen') {
+    return { kind: 'fullscreen' as const, value: 1 };
+  }
   if (value === 'content') {
     return { kind: 'content' as const, value: 0 };
   }
@@ -506,7 +510,8 @@ const normalizeDetent = (
   index: number,
   topInset: ReturnType<typeof resolveTopInset>,
   modal: boolean,
-  isRTL: boolean
+  isRTL: boolean,
+  fullscreenTopOffset: number
 ): NormalizedDetent => {
   const config: ModalDetentConfig =
     typeof detent === 'object' && detent !== null ? detent : { value: detent };
@@ -544,7 +549,15 @@ const normalizeDetent = (
     value,
     kind,
     programmatic: config.programmatic === true,
-    ...(isClosed ? CLOSED_INSETS : { ...topInset, ...insets }),
+    ...(isClosed
+      ? CLOSED_INSETS
+      : {
+          ...topInset,
+          ...insets,
+          ...(kind === 'fullscreen'
+            ? { usesStatusBarTopInset: false, insetTop: fullscreenTopOffset }
+            : {}),
+        }),
     widestCard: false,
     scrimOpacity,
     borderRadius: config.borderRadius ?? -1,
@@ -562,11 +575,24 @@ export const normalizeDetents = (
   detents: ReadonlyArray<ModalDetent>,
   topInset: number | undefined,
   modal: boolean,
-  isRTL: boolean
+  isRTL: boolean,
+  fullscreenTopOffset = 0
 ): NormalizedDetent[] => {
+  if (!isFiniteNonNegative(fullscreenTopOffset)) {
+    throw new Error(
+      'Invalid bottom sheet fullscreenTopOffset: expected a finite, non-negative number.'
+    );
+  }
   const resolvedTopInset = resolveTopInset(topInset);
   const normalized = detents.map((detent, index) =>
-    normalizeDetent(detent, index, resolvedTopInset, modal, isRTL)
+    normalizeDetent(
+      detent,
+      index,
+      resolvedTopInset,
+      modal,
+      isRTL,
+      fullscreenTopOffset
+    )
   );
   const widest = findWidestDetent(normalized);
   return normalized.map((detent) =>
@@ -645,4 +671,23 @@ export const validateSettleDuration = (settleDuration: number | undefined) => {
       `Bottom sheet settleDuration is ${String(settleDuration)} milliseconds, which looks like a value in seconds. settleDuration takes milliseconds: pass ${String(settleDuration * 1000)} for ${String(settleDuration)} seconds.`
     );
   }
+};
+
+/** Serializes the content boundary: -1 asks the native host for its safe area. */
+export const resolveContentTopInset = (
+  value: number | 'safeArea',
+  offset = 0
+) => {
+  if (!Number.isFinite(offset)) {
+    throw new Error(
+      'Invalid bottom sheet contentTopInsetOffset: expected a finite number.'
+    );
+  }
+  if (value === 'safeArea') return -1;
+  if (!isFiniteNonNegative(value)) {
+    throw new Error(
+      "Invalid bottom sheet contentTopInset: expected 'safeArea' or a finite, non-negative number."
+    );
+  }
+  return value;
 };

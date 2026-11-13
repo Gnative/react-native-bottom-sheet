@@ -41,6 +41,8 @@ internal class SheetState(val hostView: ViewGroup, val sheetContainer: BottomShe
   var targetIndex: Int = 0
   var animateContentHeight: Boolean = true
   var scaleContent: Boolean = true
+  var contentTopInset = 0f
+  var contentTopInsetOffset = 0f
   var modal: Boolean = false
 
   var scrollExpandCoordination: Int = ScrollCoordinationLevel.HANDOFF.value
@@ -90,6 +92,12 @@ internal class SheetState(val hostView: ViewGroup, val sheetContainer: BottomShe
   val isTargetingClosedDetent: Boolean
     get() = detentSpecs.getOrNull(targetIndex)?.position == 0f
 
+  fun contentInsetAt(position: Float): Float {
+    val base = if (contentTopInset < 0f) statusBarOverlapPx else contentTopInset
+    val boundary = (base + contentTopInsetOffset).coerceIn(0f, height.toFloat())
+    return (boundary - (height - position)).coerceAtLeast(0f)
+  }
+
   // Preserve upstream card scaling unless the caller opts out.
   fun contentScale(insets: DetentInsets): Float {
     if (!scaleContent) return 1f
@@ -101,7 +109,7 @@ internal class SheetState(val hostView: ViewGroup, val sheetContainer: BottomShe
   // The tallest the card can be at a detent: the host's height, less the detent's top and bottom
   // insets. Percentages resolve against it, so `100%` fits.
   fun availableCardHeight(spec: RawDetentSpec): Float =
-    (height - (spec.insets.top ?: statusBarOverlapPx) - spec.insets.bottom).coerceAtLeast(0f)
+    (height - (spec.insets.top ?: if (spec.kind == DetentKind.FULLSCREEN) 0f else statusBarOverlapPx) - spec.insets.bottom).coerceAtLeast(0f)
 
   // Interpolates a per-detent value (one per detent, by index) by the sheet
   // position, using each detent's resolved position as the breakpoint.

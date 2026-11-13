@@ -159,6 +159,14 @@ class BottomSheetViewManager :
     view.animateIn = animateIn
   }
 
+  override fun setContentTopInsetOffset(view: BottomSheetView, contentTopInsetOffset: Double) {
+    view.contentTopInsetOffset = contentTopInsetOffset
+  }
+
+  override fun setContentTopInset(view: BottomSheetView, contentTopInset: Double) {
+    view.contentTopInset = contentTopInset
+  }
+
   override fun setScaleContent(view: BottomSheetView, scaleContent: Boolean) {
     view.scaleContent = scaleContent
   }

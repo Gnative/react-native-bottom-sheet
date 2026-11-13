@@ -147,6 +147,14 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
     setIndex(index)
   }
 
+  var contentTopInsetOffset: Double
+    get() = host.contentTopInsetOffset
+    set(value) { host.contentTopInsetOffset = value }
+
+  var contentTopInset: Double
+    get() = host.contentTopInset
+    set(value) { host.contentTopInset = value }
+
   var scaleContent: Boolean
     get() = host.scaleContent
     set(value) { host.scaleContent = value }

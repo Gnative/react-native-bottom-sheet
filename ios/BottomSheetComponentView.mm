@@ -137,6 +137,14 @@ using namespace facebook::react;
     _sheetView.animateContentHeight = newViewProps.animateContentHeight;
   }
 
+  if (newViewProps.contentTopInsetOffset != oldViewProps.contentTopInsetOffset) {
+    _sheetView.contentTopInsetOffset = newViewProps.contentTopInsetOffset;
+  }
+
+  if (newViewProps.contentTopInset != oldViewProps.contentTopInset) {
+    _sheetView.contentTopInset = newViewProps.contentTopInset;
+  }
+
   if (newViewProps.scaleContent != oldViewProps.scaleContent) {
     _sheetView.scaleContent = newViewProps.scaleContent;
   }

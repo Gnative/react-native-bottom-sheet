@@ -69,6 +69,28 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
 
   // MARK: - State
 
+  var contentTopInsetOffset: Double
+    get() = state.contentTopInsetOffset.toDouble() / state.density
+    set(value) {
+      val nativeValue = (value * state.density).toFloat()
+      if (state.contentTopInsetOffset == nativeValue) return
+      state.contentTopInsetOffset = nativeValue
+      if (state.hasLaidOut) contentRegion.isContentRegionChangePending = true
+      contentRegion.recomputeNativeGeometry()
+      requestLayout()
+    }
+
+  var contentTopInset: Double
+    get() = if (state.contentTopInset < 0f) -1.0 else state.contentTopInset.toDouble() / state.density
+    set(value) {
+      val nativeValue = if (value < 0) -1f else (value * state.density).toFloat()
+      if (state.contentTopInset == nativeValue) return
+      state.contentTopInset = nativeValue
+      if (state.hasLaidOut) contentRegion.isContentRegionChangePending = true
+      contentRegion.recomputeNativeGeometry()
+      requestLayout()
+    }
+
   var scaleContent: Boolean
     get() = state.scaleContent
     set(value) {

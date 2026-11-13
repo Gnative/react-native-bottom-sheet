@@ -44,6 +44,7 @@ internal class Detents(
       val value = (dict["value"] as Number).toDouble()
       val kind =
         when (dict["kind"] as? String) {
+          "fullscreen" -> DetentKind.FULLSCREEN
           "content" -> DetentKind.CONTENT
           "percentage" -> DetentKind.PERCENTAGE
           else -> DetentKind.POINTS
@@ -159,6 +160,7 @@ internal class Detents(
         when (spec.kind) {
           DetentKind.POINTS -> spec.value
           DetentKind.PERCENTAGE -> available * spec.value
+          DetentKind.FULLSCREEN -> available
           DetentKind.CONTENT ->
             measuredContentHeight?.let { it * state.contentScale(spec.insets) }
               ?: unresolvedContentDetentHeight(index, maxHeight)
@@ -185,7 +187,7 @@ internal class Detents(
       when (nextBound.kind) {
         DetentKind.POINTS -> nextBound.value
         DetentKind.PERCENTAGE -> available * nextBound.value
-        DetentKind.CONTENT -> available
+        DetentKind.FULLSCREEN, DetentKind.CONTENT -> available
       }
     // Whatever its inset, this detent must not rise above the next one's top.
     return nextBoundHeight.coerceIn(0f, available) + nextBound.insets.bottom -

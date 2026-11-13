@@ -37,6 +37,9 @@ export interface NativeProps extends ViewProps {
   animateIn?: CodegenTypes.WithDefault<boolean, true>;
   animateContentHeight?: CodegenTypes.WithDefault<boolean, true>;
   scaleContent?: CodegenTypes.WithDefault<boolean, true>;
+  // -1 resolves against the host window safe area.
+  contentTopInset?: CodegenTypes.WithDefault<CodegenTypes.Double, 0>;
+  contentTopInsetOffset?: CodegenTypes.WithDefault<CodegenTypes.Double, 0>;
   modal: boolean;
   windowOverlay?: boolean;
   // When the sheet last opened, relative to other sheets (0 until it first
