@@ -182,6 +182,7 @@ internal class Gestures(
       MotionEvent.ACTION_UP,
       MotionEvent.ACTION_CANCEL -> {
         state.isPanning = false
+        snapping.endDragEventIfNeeded()
         activePointerId = MotionEvent.INVALID_POINTER_ID
         val velocity =
           velocityTracker?.let { tracker ->
@@ -209,6 +210,7 @@ internal class Gestures(
   }
 
   private fun beginPan(event: MotionEvent) {
+    snapping.startDragEventIfNeeded()
     state.isPanning = true
     // The user takes control: drop any index retained from props.
     state.pendingIndex = null
@@ -260,6 +262,7 @@ internal class Gestures(
   }
 
   fun clearTouchState() {
+    snapping.endDragEventIfNeeded()
     state.initialTouchY = 0f
     state.initialTouchX = 0f
     lastTouchY = 0f

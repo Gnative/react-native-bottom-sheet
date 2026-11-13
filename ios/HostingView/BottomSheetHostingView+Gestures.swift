@@ -1,6 +1,18 @@
 import UIKit
 
 extension BottomSheetHostingView {
+  func startDragEventIfNeeded() {
+    guard !dragEventActive else { return }
+    dragEventActive = true
+    eventDelegate?.bottomSheetHostingViewDidStartDrag(self)
+  }
+
+  func endDragEventIfNeeded() {
+    guard dragEventActive else { return }
+    dragEventActive = false
+    eventDelegate?.bottomSheetHostingViewDidEndDrag(self)
+  }
+
   @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
     let maxHeight = sheetContainerHeight
 
@@ -60,6 +72,7 @@ extension BottomSheetHostingView {
         }
       }
       gesture.setTranslation(.zero, in: self)
+      startDragEventIfNeeded()
 
     case .changed:
       let delta = gesture.translation(in: self).y
@@ -141,6 +154,7 @@ extension BottomSheetHostingView {
 
     case .ended, .cancelled:
       isPanning = false
+      endDragEventIfNeeded()
       setContentInteractionEnabled(true)
       let coordinatedScrollView = !activeScrollViewStates.isEmpty
       let sheetMoved = didMoveSheetDuringPan
@@ -183,6 +197,7 @@ extension BottomSheetHostingView {
 
     case .failed:
       isPanning = false
+      endDragEventIfNeeded()
       panStartingIndex = nil
       activeDragRange = nil
       activeDragDetentSpecs = nil

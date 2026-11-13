@@ -11,10 +11,13 @@ import {
   useSheetBottomPadding,
 } from '../demoShared';
 
-type SnapEventSource = 'press' | 'resize' | 'indexChange' | 'settle';
+type SnapEventSource =
+  'press' | 'resize' | 'indexChange' | 'settle' | 'dragStart' | 'dragEnd';
 type SnapEvent = { id: number; source: SnapEventSource; index: number };
 
 const SNAP_EVENT_LABEL: Record<SnapEventSource, string> = {
+  dragStart: '↕ onDragStart — pan accepted',
+  dragEnd: '◇ onDragEnd — pan ended',
   press: '⊙ setIndex — programmatic begin',
   resize: '↔ content height — toggled by 100',
   indexChange: '▶ onIndexChange — snap committed',
@@ -22,6 +25,8 @@ const SNAP_EVENT_LABEL: Record<SnapEventSource, string> = {
 };
 
 const SNAP_EVENT_COLOR: Record<SnapEventSource, string> = {
+  dragStart: '#9333ea',
+  dragEnd: '#be185d',
   press: '#8a5a1a',
   resize: '#0369a1',
   indexChange: '#1f6feb',
@@ -65,6 +70,8 @@ export const SnapCallbacksScreen = () => {
             setIndex(nextIndex);
           }}
           onSettle={(nextIndex) => logEvent('settle', nextIndex)}
+          onDragStart={() => logEvent('dragStart', index)}
+          onDragEnd={() => logEvent('dragEnd', index)}
           surface={<SheetBackground style={StyleSheet.absoluteFill} />}
         >
           <SheetHeader
@@ -96,9 +103,10 @@ export const SnapCallbacksScreen = () => {
               resize should log onSettle at index 2 without onIndexChange.
             </Text>
             <Text style={{ fontSize: 15, lineHeight: 22, color: '#555' }}>
-              onIndexChange fires the instant a drag commits to a detent;
-              onSettle fires when the sheet arrives. For a programmatic snap the
-              begin moment is the button press itself, so only onSettle follows.
+              onDragStart and onDragEnd bracket the accepted drag, including
+              cancellation. onIndexChange fires when a drag commits; onSettle
+              fires when the sheet arrives. For a programmatic snap the begin
+              moment is the button press itself, so only onSettle follows.
             </Text>
             <View style={{ height: extraHeight }} />
           </View>

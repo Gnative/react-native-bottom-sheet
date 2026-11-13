@@ -13,6 +13,7 @@ import {
 } from './scrollCoordination';
 import type { SheetSnapping } from './snapping';
 import type {
+  BottomSheetWebCallbacks,
   BottomSheetWebConfig,
   BottomSheetWebElements,
   ResolvedDetent,
@@ -78,10 +79,12 @@ export type GesturesHost = {
   requireConfig(): BottomSheetWebConfig;
   setTranslateY(ty: number): void;
   emitPosition(): void;
+  emit(callback: (callbacks: BottomSheetWebCallbacks) => void): void;
 };
 
 export class SheetGestures {
   private gesture: Gesture | null = null;
+  private dragEventActive = false;
   private suppressClicksUntil = 0;
   private restoreUserSelect: (() => void) | null = null;
 
@@ -110,12 +113,19 @@ export class SheetGestures {
     container.removeEventListener('click', this.handleContainerClick, true);
   }
 
+  private endDragEventIfNeeded() {
+    if (!this.dragEventActive) return;
+    this.dragEventActive = false;
+    this.host.emit((callbacks) => callbacks.onDragEnd());
+  }
+
   /** Drops any gesture in progress. */
   reset() {
     this.restoreUserSelect?.();
     this.restoreUserSelect = null;
     this.gesture = null;
     this.host.isPanning = false;
+    this.endDragEventIfNeeded();
     this.host.momentum.cancel();
   }
 
@@ -285,6 +295,10 @@ export class SheetGestures {
       host.snapping.cancelSpring();
     }
     host.isPanning = true;
+    if (!this.dragEventActive) {
+      this.dragEventActive = true;
+      host.emit((callbacks) => callbacks.onDragStart());
+    }
     // The user takes control: drop any index retained from props.
     host.pendingIndex = null;
     host.scrimPinnedFull = false;
@@ -437,6 +451,7 @@ export class SheetGestures {
       return;
     }
     host.isPanning = false;
+    this.endDragEventIfNeeded();
 
     const velocity = this.releaseVelocity(gesture);
     if (gesture.didMoveSheet || gesture.manualScroll) {

@@ -3,6 +3,8 @@ import UIKit
 @objc public protocol BottomSheetHostingViewDelegate: AnyObject {
   func bottomSheetHostingView(_ view: BottomSheetHostingView, didChangeIndex index: Int)
   func bottomSheetHostingView(_ view: BottomSheetHostingView, didSettle index: Int)
+  func bottomSheetHostingViewDidStartDrag(_ view: BottomSheetHostingView)
+  func bottomSheetHostingViewDidEndDrag(_ view: BottomSheetHostingView)
   func bottomSheetHostingView(
     _ view: BottomSheetHostingView, didChangePosition position: CGFloat, index: CGFloat
   )
@@ -155,6 +157,7 @@ public final class BottomSheetHostingView: UIView {
   var pendingSnapRequest: PendingSnapRequest?
   var hasLaidOut = false
   var isPanning = false
+  var dragEventActive = false
   var lastReportedInvalidDetentMessage: String?
   var panStartingIndex: Int?
   var initialScrollViewStates: [ActiveScrollViewState] = []
@@ -619,6 +622,7 @@ public final class BottomSheetHostingView: UIView {
   }
 
   public func resetSheetState() {
+    endDragEventIfNeeded()
     activeSpring = nil
     activeSpringEmitsSettle = false
     interruptedSpringEmitsSettle = nil

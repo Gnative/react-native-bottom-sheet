@@ -125,14 +125,13 @@ The callback responsibilities are intentionally distinct:
 When `animateContentHeight` is disabled, an active `'content'` detent follows
 content-size changes immediately. The surface must still remain fully covered.
 
-## Gesture event lifecycle
+## Drag event lifecycle
 
-`onGestureStart` means the sheet's native pan recognizer has begun handling a
-drag; it is not a raw touch-down event. Emit it once per accepted pan.
-`onGestureEnd` means native pan handling ended, was cancelled, or failed. Emit
-it once for each emitted start, before any subsequent settle completes. Keep
-these events aligned across iOS and Android and do not emit them for purely
-programmatic snaps.
+`onDragStart` means the sheet's native pan recognizer has begun handling a drag;
+it is not a raw touch-down event. Emit it once per accepted pan. `onDragEnd`
+means native pan handling ended, was cancelled, or failed. Emit it once for each
+emitted start, before any subsequent settle completes. Keep these events aligned
+across iOS and Android and do not emit them for purely programmatic snaps.
 
 ## iOS navigation-transition stability
 

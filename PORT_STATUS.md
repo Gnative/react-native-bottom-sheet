@@ -35,10 +35,9 @@ updated, but the test run failed in example settings during Expo React Native
 autolinking before compiling this library. Full native builds and device
 verification remain outstanding.
 
-This is the first implementation step. Fullscreen detents, gesture lifecycle
-callbacks, navigation stability from the old Contours branch still need porting
-and verification. Do not switch the app or publish this branch as a complete
-replacement yet.
+This is the first implementation step. Fullscreen detents and navigation
+stability from the old Contours branch still need porting and verification. Do
+not switch the app or publish this branch as a complete replacement yet.
 
 Top/bottom overrides take precedence over `borderRadius`; omitted values inherit
 the corresponding corners from `surfaceStyle`. Zero explicitly squares that
@@ -49,3 +48,11 @@ height changes without emitting `onIndexChange`. No-op layouts remain silent;
 in-flight springs retain their pending completion. Focused web resolver tests
 cover these paths; Android regression coverage was added but native execution
 remains subject to the example build setup noted above.
+
+Drag lifecycle callbacks are now wired through Fabric and both native hosts, and
+supported by the web gesture controller. `onDragStart` reports an accepted pan,
+not touch-down. `onDragEnd` pairs it on release/cancellation or reset, before
+settling. Direct and nested Android drag paths share a guarded event pair. The
+snap-callback demo logs both events. Seven focused web lifecycle tests pass;
+Android direct-drag, cancellation, and nested-handoff tests were added but
+native execution remains unverified.

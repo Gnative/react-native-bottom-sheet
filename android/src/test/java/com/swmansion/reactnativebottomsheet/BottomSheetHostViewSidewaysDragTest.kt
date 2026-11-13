@@ -39,6 +39,66 @@ class BottomSheetHostViewSidewaysDragTest {
   }
 
   @Test
+  fun `accepted drags pair gesture events before settling including cancellation`() {
+    for (finish in listOf(MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL)) {
+      withSheet { sheet, _ ->
+        val events = mutableListOf<String>()
+        sheet.listener = eventListener(events)
+        val x = WIDTH_PX / 2f
+        val y = HEIGHT_PX - 100f * sheet.resources.displayMetrics.density
+        fun send(action: Int, time: Long, offset: Float, intercept: Boolean = false) {
+          val event = MotionEvent.obtain(1000L, time, action, x, y + offset, 0)
+          try {
+            if (intercept) sheet.onInterceptTouchEvent(event) else sheet.onTouchEvent(event)
+          } finally { event.recycle() }
+        }
+        send(MotionEvent.ACTION_DOWN, 1000L, 0f, intercept = true)
+        assertTrue(events.isEmpty())
+        send(MotionEvent.ACTION_MOVE, 1050L, -60f, intercept = true)
+        send(MotionEvent.ACTION_MOVE, 1050L, -60f)
+        send(MotionEvent.ACTION_MOVE, 1100L, -80f)
+        assertEquals(listOf("start"), events)
+        send(finish, 1150L, -80f)
+        assertEquals(listOf("start", "end"), events.take(2))
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(5))
+        assertEquals(listOf("start", "end", "settle"), events)
+      }
+    }
+  }
+
+  @Test
+  fun `nested scroll handoff emits one gesture pair before settling`() {
+    withSheet { sheet, content ->
+      sheet.scrollExpandCoordination = 2
+      val list = tallScrollView(sheet.context)
+      content.addView(list)
+      layout(sheet, content)
+      val events = mutableListOf<String>()
+      sheet.listener = eventListener(events)
+      sheet.interceptsMoves(0f to -60f)
+      val axes = ViewCompat.SCROLL_AXIS_VERTICAL
+      val type = ViewCompat.TYPE_TOUCH
+      assertTrue(sheet.onStartNestedScroll(content, list, axes, type))
+      sheet.onNestedScrollAccepted(content, list, axes, type)
+      sheet.onNestedPreScroll(list, 0, 40, IntArray(2), type)
+      sheet.onNestedPreScroll(list, 0, 40, IntArray(2), type)
+      assertEquals(listOf("start"), events)
+      sheet.onStopNestedScroll(list, type)
+      shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(5))
+      assertEquals(listOf("start", "end", "settle"), events)
+    }
+  }
+
+  private fun eventListener(events: MutableList<String>) = object : BottomSheetViewListener {
+    override fun onIndexChange(index: Int) = Unit
+    override fun onPositionChange(position: Double, index: Double) = Unit
+    override fun onCloseRequest() = Unit
+    override fun onDragStart() { events.add("start") }
+    override fun onDragEnd() { events.add("end") }
+    override fun onSettle(index: Int) { events.add("settle") }
+  }
+
+  @Test
   fun `a shallow diagonal drag inside a vertical scrollable is intercepted for the sheet`() {
     withSheet { sheet, content ->
       content.addView(tallScrollView(sheet.context))

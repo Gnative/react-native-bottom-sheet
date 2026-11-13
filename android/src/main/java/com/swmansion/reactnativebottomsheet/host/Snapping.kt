@@ -30,6 +30,20 @@ internal class Snapping(
   private val host: SheetHost,
 ) {
 
+  private var dragEventActive = false
+
+  fun startDragEventIfNeeded() {
+    if (dragEventActive) return
+    dragEventActive = true
+    host.listener?.onDragStart()
+  }
+
+  fun endDragEventIfNeeded() {
+    if (!dragEventActive) return
+    dragEventActive = false
+    host.listener?.onDragEnd()
+  }
+
   /**
    * Whether a close request has anything to act on while the scrim shows: an `onCloseRequest`
    * handler or, without one, a closed detent the sheet may snap to.

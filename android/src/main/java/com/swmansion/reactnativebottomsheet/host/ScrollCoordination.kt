@@ -72,6 +72,7 @@ internal class ScrollCoordination(private val state: SheetState, private val sna
     nestedScrollingParentHelper.onStopNestedScroll(target, type)
     if (type == ViewCompat.TYPE_TOUCH && nestedScrollInProgress) {
       state.isPanning = false
+      snapping.endDragEventIfNeeded()
       if (nestedSheetMoved && !nestedPanSettled) {
         snapping.settleActivePan(0f)
       } else if (!nestedSheetMoved) {
@@ -144,6 +145,7 @@ internal class ScrollCoordination(private val state: SheetState, private val sna
     }
 
     state.isPanning = false
+    snapping.endDragEventIfNeeded()
     nestedPanSettled = true
     snapping.settleActivePan(-normalizedVelocityY)
     return true
@@ -165,6 +167,7 @@ internal class ScrollCoordination(private val state: SheetState, private val sna
     val oldTy = state.sheetContainer.translationY
     val newTy = (oldTy - normalizedDy).coerceIn(range.start, range.endInclusive)
     if (newTy == oldTy) return 0
+    snapping.startDragEventIfNeeded()
 
     state.sheetContainer.translationY = newTy
     nestedSheetMoved = true
@@ -175,6 +178,7 @@ internal class ScrollCoordination(private val state: SheetState, private val sna
   }
 
   fun clearNestedScrollState() {
+    snapping.endDragEventIfNeeded()
     val touchTarget = nestedTouchTarget
     val shouldRestoreDisabled = touchTarget is ScrollView && !nestedTouchWasEnabled
 

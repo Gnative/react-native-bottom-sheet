@@ -87,6 +87,8 @@ export interface NativeProps extends ViewProps {
   onIndexChange?: CodegenTypes.DirectEventHandler<
     Readonly<{ index: CodegenTypes.Int32 }>
   >;
+  onDragStart?: CodegenTypes.DirectEventHandler<Readonly<{}>>;
+  onDragEnd?: CodegenTypes.DirectEventHandler<Readonly<{}>>;
   onSettle?: CodegenTypes.DirectEventHandler<
     Readonly<{ index: CodegenTypes.Int32 }>
   >;

@@ -7,6 +7,8 @@ NS_ASSUME_NONNULL_BEGIN
 @protocol BottomSheetContentViewDelegate <NSObject>
 - (void)bottomSheetView:(BottomSheetContentView *)view didChangeIndex:(NSInteger)index;
 - (void)bottomSheetView:(BottomSheetContentView *)view didSettle:(NSInteger)index;
+- (void)bottomSheetViewDidStartDrag:(BottomSheetContentView *)view;
+- (void)bottomSheetViewDidEndDrag:(BottomSheetContentView *)view;
 - (void)bottomSheetView:(BottomSheetContentView *)view
       didChangePosition:(CGFloat)position
                   index:(CGFloat)index;

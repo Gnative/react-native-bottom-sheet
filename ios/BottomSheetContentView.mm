@@ -220,6 +220,16 @@
   [self.delegate bottomSheetView:self didChangeIndex:index];
 }
 
+- (void)bottomSheetHostingViewDidStartDrag:(BottomSheetHostingView *)view
+{
+  [self.delegate bottomSheetViewDidStartDrag:self];
+}
+
+- (void)bottomSheetHostingViewDidEndDrag:(BottomSheetHostingView *)view
+{
+  [self.delegate bottomSheetViewDidEndDrag:self];
+}
+
 - (void)bottomSheetHostingView:(BottomSheetHostingView *)view didSettle:(NSInteger)index
 {
   [self.delegate bottomSheetView:self didSettle:index];

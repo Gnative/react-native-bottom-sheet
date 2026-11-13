@@ -77,6 +77,8 @@ export const BottomSheetView = (props: BottomSheetViewProps) => {
     surfaceShadowColor,
     onIndexChange,
     onSettle,
+    onDragStart,
+    onDragEnd,
     onPositionChange,
     onCloseRequest,
     ...viewProps
@@ -154,6 +156,8 @@ export const BottomSheetView = (props: BottomSheetViewProps) => {
     controller.setCallbacks({
       onIndexChange: (newIndex) =>
         onIndexChange?.({ nativeEvent: { index: newIndex } } as never),
+      onDragStart: () => onDragStart?.({ nativeEvent: {} } as never),
+      onDragEnd: () => onDragEnd?.({ nativeEvent: {} } as never),
       onSettle: (newIndex) =>
         onSettle?.({ nativeEvent: { index: newIndex } } as never),
       onPositionChange: (position, positionIndex) =>

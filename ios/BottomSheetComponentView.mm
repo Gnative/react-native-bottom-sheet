@@ -508,6 +508,22 @@ using namespace facebook::react;
   }
 }
 
+- (void)bottomSheetViewDidStartDrag:(BottomSheetContentView *)view
+{
+  if (_eventEmitter) {
+    auto emitter = std::static_pointer_cast<const BottomSheetViewEventEmitter>(_eventEmitter);
+    emitter->onDragStart({});
+  }
+}
+
+- (void)bottomSheetViewDidEndDrag:(BottomSheetContentView *)view
+{
+  if (_eventEmitter) {
+    auto emitter = std::static_pointer_cast<const BottomSheetViewEventEmitter>(_eventEmitter);
+    emitter->onDragEnd({});
+  }
+}
+
 - (void)bottomSheetView:(BottomSheetContentView *)view didSettle:(NSInteger)index
 {
   [self updateAccessibilityModality];

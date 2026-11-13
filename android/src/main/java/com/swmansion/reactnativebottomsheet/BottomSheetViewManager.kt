@@ -42,6 +42,14 @@ class BottomSheetViewManager :
           dispatchEvent(view, "topIndexChange", event)
         }
 
+        override fun onDragStart() {
+          dispatchEvent(view, "topDragStart", Arguments.createMap())
+        }
+
+        override fun onDragEnd() {
+          dispatchEvent(view, "topDragEnd", Arguments.createMap())
+        }
+
         override fun onSettle(index: Int) {
           val event = Arguments.createMap().apply { putInt("index", index) }
           dispatchEvent(view, "topSettle", event)
@@ -100,6 +108,8 @@ class BottomSheetViewManager :
     return mapOf(
       "topIndexChange" to mapOf("registrationName" to "onIndexChange"),
       "topSettle" to mapOf("registrationName" to "onSettle"),
+      "topDragStart" to mapOf("registrationName" to "onDragStart"),
+      "topDragEnd" to mapOf("registrationName" to "onDragEnd"),
       "topPositionChange" to mapOf("registrationName" to "onPositionChange"),
       "topCloseRequest" to mapOf("registrationName" to "onCloseRequest"),
     )

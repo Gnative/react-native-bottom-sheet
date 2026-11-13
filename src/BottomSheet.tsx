@@ -193,6 +193,10 @@ export interface BottomSheetProps {
   onIndexChange?: (index: number) => void;
   /** Called when a snap or active-detent resize completes, including immediate resizes. */
   onSettle?: (index: number) => void;
+  /** Called once when a sheet pan is accepted, after touch slop, not on touch-down. */
+  onDragStart?: () => void;
+  /** Called once when that pan ends or is cancelled, before its settle completes. */
+  onDragEnd?: () => void;
   /**
    * Called as the sheet position changes. A standard native direct event; read
    * `event.nativeEvent.position` (the distance from the host's bottom to the
@@ -285,6 +289,8 @@ export const BottomSheet = (props: BottomSheetProps) => {
     lazy = false,
     onIndexChange,
     onSettle,
+    onDragStart,
+    onDragEnd,
     onPositionChange,
     onCloseRequest,
     wrapNativeView,
@@ -449,6 +455,8 @@ export const BottomSheet = (props: BottomSheetProps) => {
           surfaceShadowColor={shadowColor}
           onIndexChange={handleIndexChange}
           onSettle={handleSettle}
+          onDragStart={() => onDragStart?.()}
+          onDragEnd={() => onDragEnd?.()}
           onPositionChange={onPositionChange}
           onCloseRequest={onCloseRequest}
         >

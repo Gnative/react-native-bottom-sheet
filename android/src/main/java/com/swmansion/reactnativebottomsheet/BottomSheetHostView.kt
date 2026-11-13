@@ -28,6 +28,10 @@ interface BottomSheetViewListener {
 
   fun onSettle(index: Int)
 
+  fun onDragStart() = Unit
+
+  fun onDragEnd() = Unit
+
   fun onPositionChange(position: Double, index: Double)
 
   fun onCloseRequest()
@@ -616,6 +620,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
   // MARK: - Cleanup
 
   fun destroy() {
+    snapping.endDragEventIfNeeded()
     scrollCoordination.clearNestedScrollState()
     state.activeAnimation?.cancel()
     state.activeAnimation = null
