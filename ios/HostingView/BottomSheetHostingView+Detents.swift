@@ -254,6 +254,7 @@ extension BottomSheetHostingView {
           setSheetTranslation(targetTy)
           emitPosition()
           scrimPinnedFull = false
+          eventDelegate?.bottomSheetHostingView(self, didSettle: targetIndex)
         } else {
           // The content detent changed (grew or shrank): re-anchor at the
           // current visible height, then animate to the new target. The surface
@@ -265,7 +266,7 @@ extension BottomSheetHostingView {
             targetIndex,
             velocity: 0,
             emitIndexChange: false,
-            emitSettle: false,
+            emitSettle: true,
             preserveScrimPin: true
           )
         }

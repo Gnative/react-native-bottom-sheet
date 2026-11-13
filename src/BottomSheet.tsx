@@ -191,7 +191,7 @@ export interface BottomSheetProps {
    * use `onSettle`.
    */
   onIndexChange?: (index: number) => void;
-  /** Called when a snap animation settles, including programmatic changes. */
+  /** Called when a snap or active-detent resize completes, including immediate resizes. */
   onSettle?: (index: number) => void;
   /**
    * Called as the sheet position changes. A standard native direct event; read

@@ -418,13 +418,15 @@ export class BottomSheetWebController {
 
     const currentVisibleHeight = previousHostHeight - this.translateY;
     const targetHeight = this.snapping.detentPosition(this.targetIndex);
-    if (
-      Math.abs(targetHeight - currentVisibleHeight) <= 0.5 ||
-      !this.shouldAnimateContentHeight(this.targetIndex)
-    ) {
+    const heightChanged = Math.abs(targetHeight - currentVisibleHeight) > 0.5;
+    if (!heightChanged || !this.shouldAnimateContentHeight(this.targetIndex)) {
       this.setTranslateY(targetTy);
       this.emitPosition();
       this.scrimPinnedFull = false;
+      if (heightChanged) {
+        const settledIndex = this.targetIndex;
+        this.emit((callbacks) => callbacks.onSettle(settledIndex));
+      }
     } else {
       // The target detent changed height: re-anchor at the current visible
       // height, then animate to the new one. The surface covers the full
@@ -433,7 +435,7 @@ export class BottomSheetWebController {
         clamp(hostHeight - currentVisibleHeight, 0, hostHeight)
       );
       this.emitPosition();
-      this.snapping.snapToIndex(this.targetIndex, 0, false, false, true);
+      this.snapping.snapToIndex(this.targetIndex, 0, false, true, true);
     }
   }
 

@@ -33,6 +33,36 @@ class BottomSheetHostViewDetentInsetsTest {
   }
 
   @Test
+  fun `active detent resizes settle once without changing the index`() {
+    withSheet(listOf(points(0.0), points(100.0), points(600.0))) { sheet ->
+      val settles = mutableListOf<Int>()
+      val indexChanges = mutableListOf<Int>()
+      sheet.listener = object : BottomSheetViewListener {
+        override fun onIndexChange(index: Int) { indexChanges.add(index) }
+        override fun onSettle(index: Int) { settles.add(index) }
+        override fun onPositionChange(position: Double, index: Double) = Unit
+        override fun onCloseRequest() = Unit
+      }
+      sheet.setDetents(listOf(points(0.0), points(200.0), points(600.0)))
+      shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(5))
+      assertEquals(listOf(1), settles)
+      assertTrue(indexChanges.isEmpty())
+
+      // An unchanged layout must not issue another settle.
+      sheet.setDetents(listOf(points(0.0), points(200.0), points(600.0)))
+      shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(5))
+      assertEquals(listOf(1), settles)
+
+      // Resizing again before the first resize finishes supersedes that spring.
+      sheet.setDetents(listOf(points(0.0), points(300.0), points(600.0)))
+      sheet.setDetents(listOf(points(0.0), points(150.0), points(600.0)))
+      shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(5))
+      assertEquals(listOf(1, 1), settles)
+      assertTrue(indexChanges.isEmpty())
+    }
+  }
+
+  @Test
   fun `a detent rests at its height plus its bottom inset`() {
     withSheet(listOf(points(0.0), points(300.0, left = 16.0, right = 8.0, bottom = 32.0))) { sheet
       ->

@@ -11,23 +11,26 @@ import {
   useSheetBottomPadding,
 } from '../demoShared';
 
-type SnapEventSource = 'press' | 'indexChange' | 'settle';
+type SnapEventSource = 'press' | 'resize' | 'indexChange' | 'settle';
 type SnapEvent = { id: number; source: SnapEventSource; index: number };
 
 const SNAP_EVENT_LABEL: Record<SnapEventSource, string> = {
   press: '⊙ setIndex — programmatic begin',
+  resize: '↔ content height — toggled by 100',
   indexChange: '▶ onIndexChange — snap committed',
   settle: '■ onSettle — movement ended',
 };
 
 const SNAP_EVENT_COLOR: Record<SnapEventSource, string> = {
   press: '#8a5a1a',
+  resize: '#0369a1',
   indexChange: '#1f6feb',
   settle: '#1a8a4a',
 };
 
 export const SnapCallbacksScreen = () => {
   const [index, setIndex] = useState(0);
+  const [extraHeight, setExtraHeight] = useState(0);
   const [events, setEvents] = useState<SnapEvent[]>([]);
   const nextEventId = useRef(0);
   const sheetBottomPadding = useSheetBottomPadding(0);
@@ -70,8 +73,9 @@ export const SnapCallbacksScreen = () => {
           />
           <View
             style={{
-              height: SECTION_HEIGHT + sheetBottomPadding,
+              minHeight: SECTION_HEIGHT + sheetBottomPadding + extraHeight,
               paddingHorizontal: 20,
+              paddingTop: 16,
               paddingBottom: sheetBottomPadding,
               justifyContent: 'center',
               gap: 12,
@@ -80,11 +84,23 @@ export const SnapCallbacksScreen = () => {
             <Text style={{ fontSize: 18, fontWeight: '600' }}>
               Drag the sheet or use the buttons
             </Text>
+            <Button
+              title={extraHeight === 0 ? 'Add 100 height' : 'Remove 100 height'}
+              onPress={() => {
+                logEvent('resize', index);
+                setExtraHeight((height) => (height === 0 ? 100 : 0));
+              }}
+            />
+            <Text>
+              Snap to content (index 2), then toggle the height. Each completed
+              resize should log onSettle at index 2 without onIndexChange.
+            </Text>
             <Text style={{ fontSize: 15, lineHeight: 22, color: '#555' }}>
               onIndexChange fires the instant a drag commits to a detent;
               onSettle fires when the sheet arrives. For a programmatic snap the
               begin moment is the button press itself, so only onSettle follows.
             </Text>
+            <View style={{ height: extraHeight }} />
           </View>
         </BottomSheet>
       }

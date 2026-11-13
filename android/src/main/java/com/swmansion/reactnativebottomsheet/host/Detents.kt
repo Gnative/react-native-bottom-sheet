@@ -283,6 +283,7 @@ internal class Detents(
             closeRequestPresentationTracker.onTransitionSettled()
             state.sheetContainer.translationY = targetTy
             snapping.emitPosition()
+            host.listener?.onSettle(state.targetIndex)
           } else {
             // The content detent changed (grew or shrank): re-anchor at the
             // current visible height, then animate to the new target. The
@@ -296,7 +297,7 @@ internal class Detents(
               state.targetIndex,
               0f,
               emitIndexChange = false,
-              emitSettle = false,
+              emitSettle = true,
               preserveScrimPin = true,
             )
           }

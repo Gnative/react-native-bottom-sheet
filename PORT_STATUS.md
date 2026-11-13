@@ -36,10 +36,16 @@ autolinking before compiling this library. Full native builds and device
 verification remain outstanding.
 
 This is the first implementation step. Fullscreen detents, gesture lifecycle
-callbacks, navigation stability and dynamic-detent settle semantics from the old
-Contours branch still need porting and verification. Do not switch the app or
-publish this branch as a complete replacement yet.
+callbacks, navigation stability from the old Contours branch still need porting
+and verification. Do not switch the app or publish this branch as a complete
+replacement yet.
 
 Top/bottom overrides take precedence over `borderRadius`; omitted values inherit
 the corresponding corners from `surfaceStyle`. Zero explicitly squares that
 edge.
+
+Dynamic-detent completion now emits `onSettle` for both animated and immediate
+height changes without emitting `onIndexChange`. No-op layouts remain silent;
+in-flight springs retain their pending completion. Focused web resolver tests
+cover these paths; Android regression coverage was added but native execution
+remains subject to the example build setup noted above.
