@@ -80,6 +80,11 @@
   return _impl.sheetContainer;
 }
 
+- (BOOL)isSettling
+{
+  return _impl.isSettling;
+}
+
 - (NSInteger)scrollExpandCoordination
 {
   return _impl.scrollExpandCoordination;
