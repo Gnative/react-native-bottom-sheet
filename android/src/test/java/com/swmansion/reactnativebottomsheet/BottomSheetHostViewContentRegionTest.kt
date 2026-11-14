@@ -38,6 +38,43 @@ class BottomSheetHostViewContentRegionTest {
   }
 
   @Test
+  fun `fullscreen content blends endpoint offsets instead of stopping at the safe boundary`() {
+    withSheet(listOf(points(0.0), points(320.0))) { sheet ->
+      val state = com.swmansion.reactnativebottomsheet.host.SheetState(
+        sheet, BottomSheetCardContainer(sheet.context),
+      )
+      val boundary = (59 * sheet.density).toFloat()
+      val preview = (320 * sheet.density).toFloat()
+      val full = HEIGHT_PX.toFloat()
+      val detent = { position: Float ->
+        com.swmansion.reactnativebottomsheet.host.DetentSpec(
+          position, false, com.swmansion.reactnativebottomsheet.host.DetentInsets(),
+        )
+      }
+      state.contentTopInset = boundary
+      state.detentSpecs = listOf(detent(0f), detent(preview), detent(full))
+      for (progress in listOf(0f, 0.25f, 0.5f, 0.9f, 1f)) {
+        val position = preview + (full - preview) * progress
+        assertEquals(boundary * progress, state.contentInsetAt(position), 0.01f)
+      }
+      // A snap across a safe-area-capped detent still eases directly to fullscreen.
+      state.detentSpecs = listOf(detent(0f), detent(preview), detent(full - boundary), detent(full))
+      state.contentInsetTransition = com.swmansion.reactnativebottomsheet.host.ContentInsetTransition(
+        preview, full, 0f, boundary,
+      )
+      val position = full - boundary / 2
+      val expected = boundary * (position - preview) / (full - preview)
+      assertEquals(expected, state.contentInsetAt(position), 0.01f)
+      // Taking over a snap retains the rendered offset at the interruption.
+      state.contentInsetTransition = null
+      state.contentInsetAnchor = position to expected
+      assertEquals(expected, state.contentInsetAt(position), 0.01f)
+      assertEquals(0f, state.contentInsetAt(preview), 0.01f)
+      assertEquals(boundary, state.contentInsetAt(full), 0.01f)
+    }
+  }
+
+  @Test
   fun `fullscreen reserves content space while the surface reaches the host top`() {
     withSheet(listOf(points(0.0), mapOf("value" to 1.0, "kind" to "fullscreen"))) { sheet ->
       sheet.contentTopInset = 59.0
@@ -47,18 +84,19 @@ class BottomSheetHostViewContentRegionTest {
       sheet.addSheetChild(content, 1)
       content.applyFabricMeasure(WIDTH_PX, HEIGHT_PX, fillsRegion = true)
       layout(sheet)
-      sheet.stateWrapper = InsetRecordingStateWrapper()
+      val wrapper = InsetRecordingStateWrapper()
+      sheet.stateWrapper = wrapper
       sheet.commitContentRegion(HEIGHT_PX / sheet.density - 59.0)
       sheet.setIndex(1)
       shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
-      assertEquals(59.0, publishedInset(sheet), 0.001)
+      assertEquals(59.0, wrapper.insets.last(), 0.001)
       assertEquals(0f, surface.translationY, 0.01f)
       assertEquals((59 * sheet.density).toFloat(), content.translationY, 0.5f)
       sheet.contentTopInsetOffset = -16.0
       layout(sheet)
       sheet.commitContentRegion(HEIGHT_PX / sheet.density - 43.0)
       shadowOf(Looper.getMainLooper()).idle()
-      assertEquals(43.0, publishedInset(sheet), 0.001)
+      assertEquals(43.0, wrapper.insets.last(), 0.001)
       assertEquals(0f, surface.translationY, 0.01f)
       assertEquals((43 * sheet.density).toFloat(), content.translationY, 0.5f)
     }
@@ -429,6 +467,8 @@ class BottomSheetHostViewContentRegionTest {
       assertEquals(700.0, listener.positions.last(), 0.5)
     } finally {
       sheet.destroy()
+      // Drain the canceled spring callback before Robolectric resets the looper.
+      shadowOf(Looper.getMainLooper()).idle()
       controller.close()
     }
   }

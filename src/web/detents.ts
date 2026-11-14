@@ -27,7 +27,7 @@ export type DetentsHost = {
 };
 
 /** Content-only offset in native host coordinates, never applied to the surface. */
-export const contentTopInsetAt = (
+export const contentTopInsetAtRest = (
   host: Pick<DetentsHost, 'config' | 'statusBarOverlap' | 'hostHeight'>,
   position: number
 ) => {
@@ -39,6 +39,63 @@ export const contentTopInsetAt = (
     host.hostHeight
   );
   return Math.max(0, boundary - (host.hostHeight - position));
+};
+
+export type ContentInsetMotion = {
+  pinnedContentInset?: number | null;
+  contentInsetTransition?: {
+    from: number;
+    to: number;
+    fromInset: number;
+    toInset: number;
+  } | null;
+  contentInsetAnchor?: { position: number; inset: number } | null;
+};
+
+/** Blend endpoint offsets on the sheet's clock, rather than stopping at the boundary. */
+export const contentTopInsetAt = (
+  host: Pick<DetentsHost, 'config' | 'statusBarOverlap' | 'hostHeight'> &
+    ContentInsetMotion & { readonly detents: ReadonlyArray<ResolvedDetent> },
+  position: number
+) => {
+  if (host.pinnedContentInset != null) return host.pinnedContentInset;
+  const transition = host.contentInsetTransition;
+  if (transition != null) {
+    const t = (position - transition.from) / (transition.to - transition.from);
+    return Math.max(
+      0,
+      transition.fromInset + (transition.toInset - transition.fromInset) * t
+    );
+  }
+  const points = host.detents
+    .filter((detent) => detent.position > 0)
+    .map((detent) => ({
+      position: detent.position,
+      inset: contentTopInsetAtRest(host, detent.position),
+    }));
+  // An interrupted opening/closing becomes an extra interpolation point, so
+  // taking over with a drag or another snap does not jump the content.
+  const anchor = host.contentInsetAnchor;
+  if (anchor != null) {
+    const index = points.findIndex(
+      (point) => point.position === anchor.position
+    );
+    if (index >= 0) points[index] = anchor;
+    else points.push(anchor);
+    points.sort((a, b) => a.position - b.position);
+  }
+  let lower = points[0];
+  if (lower === undefined) return contentTopInsetAtRest(host, position);
+  if (position <= lower.position) return lower.inset;
+  for (const upper of points.slice(1)) {
+    if (position <= upper.position) {
+      const span = upper.position - lower.position;
+      const t = span <= 0 ? 1 : (position - lower.position) / span;
+      return lower.inset + (upper.inset - lower.inset) * t;
+    }
+    lower = upper;
+  }
+  return lower.inset;
 };
 
 /**
@@ -95,7 +152,7 @@ export const contentRegionHeight = (host: DetentsHost) => {
   const bound = cardHeightBound(host, tallest);
   const height = Math.max(
     0,
-    bound - contentTopInsetAt(host, bound + tallest.insetBottom)
+    bound - contentTopInsetAtRest(host, bound + tallest.insetBottom)
   );
   const scale = contentScale(host, tallest);
   return scale > 0 ? height / scale : height;

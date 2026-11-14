@@ -239,11 +239,19 @@ cap. Insets at the bottom shorten the card while keeping its configured top.
 Content protection is separate: `contentTopInset="safeArea"` reads the overlap
 of the actual window safe area with the host. A numeric value sets a
 host-coordinate boundary directly. Both default to no protection unless
-explicitly configured. The native content offset is
-`max(0, boundary - sheetTop)`; the surface is never translated by it. Native
-dragging and spring samples drive the content transform, without JS frame
-callbacks or per-frame Yoga padding updates. The tallest content viewport
-subtracts the protected area, including scaling in its measurement units.
+explicitly configured. At each detent the native content offset is
+`max(0, boundary - sheetTop)`; live motion interpolates those endpoint offsets
+between visible detents during dragging. A snap interpolates directly from its
+current offset to the target offset, including snaps across intermediate
+detents. Content and surface therefore share the spring's easing while
+travelling different distances, rather than abruptly stopping the content at the
+boundary. Direct opening holds the target offset throughout, and closing holds
+the current visible offset. Interrupting either retains the visible offset as an
+interpolation anchor until the next settle, avoiding a jump on takeover. The
+surface is never translated by the content offset. Native dragging and spring
+samples drive the content transform, without JS frame callbacks or per-frame
+Yoga padding updates. The tallest content viewport subtracts the protected area,
+including scaling in its measurement units.
 
 `contentTopInsetOffset` is a signed adjustment to that boundary (default **0**).
 For a 16-point handle inside the content wrapper, use:

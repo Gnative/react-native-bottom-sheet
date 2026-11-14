@@ -53,6 +53,13 @@ internal data class DetentSpec(
   val borderBottomRadius: Float = -1f,
 )
 
+internal data class ContentInsetTransition(
+  val from: Float,
+  val to: Float,
+  val fromInset: Float,
+  val toInset: Float,
+)
+
 internal data class StateSnapshot(
   val contentOffsetX: Double,
   val contentOffsetY: Double,

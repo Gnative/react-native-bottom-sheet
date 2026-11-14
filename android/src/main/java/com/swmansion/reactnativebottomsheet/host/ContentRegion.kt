@@ -84,7 +84,7 @@ internal class ContentRegion(
   private fun contentRegionHeightPx(): Float {
     val tallest = state.rawDetentSpecs.lastOrNull() ?: return state.height.toFloat()
     val height = cardHeightBound(tallest)
-    val cardHeight = (height - state.contentInsetAt(height + tallest.insets.bottom)).coerceAtLeast(0f)
+    val cardHeight = (height - state.contentInsetAtRest(height + tallest.insets.bottom)).coerceAtLeast(0f)
     val scale = state.contentScale(tallest.insets)
     return if (scale > 0f) cardHeight / scale else cardHeight
   }

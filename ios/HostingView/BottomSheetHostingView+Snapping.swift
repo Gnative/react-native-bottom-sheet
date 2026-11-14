@@ -140,6 +140,21 @@ extension BottomSheetHostingView {
       currentTy = sheetContainer.transform.ty
     }
     let targetTy = translationY(for: index)
+    let position = sheetContainerHeight - currentTy
+    let inset = contentInset(forPosition: position)
+    pinnedContentInset = nil
+    contentInsetTransition = nil
+    if detent(at: index).position == 0 {
+      pinnedContentInset = inset
+    } else if position <= 0 {
+      pinnedContentInset = contentInsetAtRest(forPosition: detent(at: index).position)
+      contentInsetAnchor = nil
+    } else if position != detent(at: index).position {
+      contentInsetTransition = (
+        from: position, to: detent(at: index).position,
+        fromInset: inset, toInset: contentInsetAtRest(forPosition: detent(at: index).position)
+      )
+    }
     let distance = targetTy - currentTy
 
     let settleDuration = self.settleDuration > 0 ? self.settleDuration : Self.defaultSettleDuration
@@ -231,6 +246,9 @@ extension BottomSheetHostingView {
     stopDisplayLink()
     removeSettleAnimations()
 
+    pinnedContentInset = nil
+    contentInsetAnchor = nil
+    contentInsetTransition = nil
     setSheetTranslation(targetTy)
     refitScrollIndicators()
     emitPosition()
@@ -257,6 +275,12 @@ extension BottomSheetHostingView {
   @discardableResult
   func cancelActiveSpring() -> CGFloat {
     let visualTy = currentTranslationY
+    if pinnedContentInset != nil || contentInsetTransition != nil {
+      let position = sheetContainerHeight - visualTy
+      contentInsetAnchor = (position: position, inset: contentInset(forPosition: position))
+      pinnedContentInset = nil
+      contentInsetTransition = nil
+    }
     activeSpring = nil
     activeSpringEmitsSettle = false
     stopDisplayLink()

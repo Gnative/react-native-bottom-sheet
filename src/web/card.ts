@@ -1,6 +1,10 @@
 /// <reference lib="dom" />
 
-import { contentTopInsetAt, firstOpenPosition } from './detents';
+import {
+  contentTopInsetAt,
+  firstOpenPosition,
+  type ContentInsetMotion,
+} from './detents';
 import { clamp, processedColorToCss } from './dom';
 import type {
   BottomSheetWebConfig,
@@ -10,7 +14,7 @@ import type {
 } from './types';
 
 /** The controller's state that the card's shape derives from. */
-export type CardHost = {
+export type CardHost = ContentInsetMotion & {
   readonly elements: BottomSheetWebElements | null;
   readonly config: BottomSheetWebConfig | null;
   readonly hostHeight: number;

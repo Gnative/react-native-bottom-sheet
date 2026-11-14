@@ -12,6 +12,7 @@ import {
   areScrimOpacitiesEqual,
   areShadowsEqual,
   contentRegionHeight,
+  type ContentInsetMotion,
   firstOpenPosition,
   isInvalidContentDetentTarget,
   resolveDetentSpecs,
@@ -63,6 +64,9 @@ export class BottomSheetWebController {
   lastReportedError: string | null = null;
 
   scrimPinnedFull = false;
+  pinnedContentInset: number | null = null;
+  contentInsetTransition: ContentInsetMotion['contentInsetTransition'] = null;
+  contentInsetAnchor: { position: number; inset: number } | null = null;
   isPanning = false;
 
   private frameRequest: number | null = null;

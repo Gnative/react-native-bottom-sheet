@@ -43,6 +43,9 @@ internal class SheetState(val hostView: ViewGroup, val sheetContainer: BottomShe
   var scaleContent: Boolean = true
   var contentTopInset = 0f
   var contentTopInsetOffset = 0f
+  var pinnedContentInset: Float? = null
+  var contentInsetTransition: ContentInsetTransition? = null
+  var contentInsetAnchor: Pair<Float, Float>? = null
   var modal: Boolean = false
 
   var scrollExpandCoordination: Int = ScrollCoordinationLevel.HANDOFF.value
@@ -92,10 +95,38 @@ internal class SheetState(val hostView: ViewGroup, val sheetContainer: BottomShe
   val isTargetingClosedDetent: Boolean
     get() = detentSpecs.getOrNull(targetIndex)?.position == 0f
 
-  fun contentInsetAt(position: Float): Float {
+  fun contentInsetAtRest(position: Float): Float {
     val base = if (contentTopInset < 0f) statusBarOverlapPx else contentTopInset
     val boundary = (base + contentTopInsetOffset).coerceIn(0f, height.toFloat())
     return (boundary - (height - position)).coerceAtLeast(0f)
+  }
+
+  // Blend endpoint offsets on the sheet's clock instead of abruptly stopping
+  // the content at the boundary while the surface is still easing.
+  fun contentInsetAt(position: Float): Float {
+    pinnedContentInset?.let { return it }
+    contentInsetTransition?.let {
+      val t = (position - it.from) / (it.to - it.from)
+      return (it.fromInset + (it.toInset - it.fromInset) * t).coerceAtLeast(0f)
+    }
+    val points = detentSpecs.filter { it.position > 0f }
+      .map { it.position to contentInsetAtRest(it.position) }.toMutableList()
+    contentInsetAnchor?.let { anchor ->
+      val index = points.indexOfFirst { it.first == anchor.first }
+      if (index >= 0) points[index] = anchor else points.add(anchor)
+      points.sortBy { it.first }
+    }
+    var lower = points.firstOrNull() ?: return contentInsetAtRest(position)
+    if (position <= lower.first) return lower.second
+    for (upper in points.drop(1)) {
+      if (position <= upper.first) {
+        val span = upper.first - lower.first
+        val t = if (span <= 0f) 1f else (position - lower.first) / span
+        return lower.second + (upper.second - lower.second) * t
+      }
+      lower = upper
+    }
+    return lower.second
   }
 
   // Preserve upstream card scaling unless the caller opts out.

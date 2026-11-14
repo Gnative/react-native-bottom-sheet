@@ -175,6 +175,21 @@ internal class Snapping(
     state.activeAnimation?.cancel()
 
     val currentTy = state.sheetContainer.translationY
+    val position = state.height - currentTy
+    val inset = state.contentInsetAt(position)
+    state.pinnedContentInset = null
+    state.contentInsetTransition = null
+    if (state.detentSpecs[index].position == 0f) {
+      state.pinnedContentInset = inset
+    } else if (position <= 0f) {
+      state.pinnedContentInset = state.contentInsetAtRest(state.detentSpecs[index].position)
+      state.contentInsetAnchor = null
+    } else if (position != state.detentSpecs[index].position) {
+      state.contentInsetTransition = ContentInsetTransition(
+        position, state.detentSpecs[index].position, inset,
+        state.contentInsetAtRest(state.detentSpecs[index].position),
+      )
+    }
     val distance = targetTy - currentTy
     val settleDuration =
       if (state.settleDuration > 0f) state.settleDuration else DEFAULT_SETTLE_DURATION
@@ -214,10 +229,19 @@ internal class Snapping(
         }
         addEndListener { _, canceled, _, _ ->
           if (canceled) {
+            if (state.pinnedContentInset != null || state.contentInsetTransition != null) {
+              val position = state.height - state.sheetContainer.translationY
+              state.contentInsetAnchor = position to state.contentInsetAt(position)
+              state.pinnedContentInset = null
+              state.contentInsetTransition = null
+            }
             return@addEndListener
           }
           state.activeAnimation = null
           state.activeAnimationEmitsSettle = false
+          state.pinnedContentInset = null
+          state.contentInsetTransition = null
+          state.contentInsetAnchor = null
           state.suppressScrimForClosingTarget = false
           state.scrimPinnedFull = false
           if (state.closedIndex == index) {

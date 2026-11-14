@@ -11,11 +11,49 @@ extension BottomSheetHostingView {
     return min(max(0, window.safeAreaInsets.top - originYInWindow), bounds.height)
   }
 
-  /// Live content-only offset, in the same host coordinate system as the sheet.
-  func contentInset(forPosition position: CGFloat) -> CGFloat {
+  /// Endpoint protection, also used for viewport measurement before detents resolve.
+  func contentInsetAtRest(forPosition position: CGFloat) -> CGFloat {
     let base = contentTopInset < 0 ? statusBarOverlap : contentTopInset
     let boundary = min(bounds.height, max(0, base + contentTopInsetOffset))
     return max(0, boundary - (sheetContainerHeight - position))
+  }
+
+  /// Blend endpoint offsets on the sheet's spring/drag clock. Clamping the live
+  /// content top to the boundary would stop it before the surface finishes easing.
+  func contentInset(forPosition position: CGFloat) -> CGFloat {
+    if let pinnedContentInset {
+      return pinnedContentInset
+    }
+    if let transition = contentInsetTransition {
+      let t = (position - transition.from) / (transition.to - transition.from)
+      return max(0, transition.fromInset + (transition.toInset - transition.fromInset) * t)
+    }
+    var points = detentSpecs.filter { $0.position > 0 }.map {
+      (position: $0.position, inset: contentInsetAtRest(forPosition: $0.position))
+    }
+    // Preserve the visible offset when a drag or another snap takes over an
+    // opening/closing animation, then blend toward the surrounding detents.
+    if let anchor = contentInsetAnchor {
+      if let index = points.firstIndex(where: { $0.position == anchor.position }) {
+        points[index] = anchor
+      } else {
+        points.append(anchor)
+        points.sort { $0.position < $1.position }
+      }
+    }
+    guard var lower = points.first else { return contentInsetAtRest(forPosition: position) }
+    if position <= lower.position {
+      return lower.inset
+    }
+    for upper in points.dropFirst() {
+      if position <= upper.position {
+        let span = upper.position - lower.position
+        let t = span <= 0 ? 1 : (position - lower.position) / span
+        return lower.inset + (upper.inset - lower.inset) * t
+      }
+      lower = upper
+    }
+    return lower.inset
   }
 
   /// Scale content to fit the card unless the caller opts out.
@@ -40,7 +78,7 @@ extension BottomSheetHostingView {
   private var contentRegionHeight: CGFloat {
     guard let tallest = rawDetentSpecs.last else { return bounds.height }
     let cardHeight = cardHeightBound(for: tallest)
-    let height = max(0, cardHeight - contentInset(forPosition: cardHeight + tallest.insets.bottom))
+    let height = max(0, cardHeight - contentInsetAtRest(forPosition: cardHeight + tallest.insets.bottom))
     let scale = contentScale(for: tallest.insets)
     return scale > 0 ? height / scale : height
   }

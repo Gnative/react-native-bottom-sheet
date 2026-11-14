@@ -133,23 +133,31 @@ public final class BottomSheetHostingView: UIView {
   public var contentTopInsetOffset: CGFloat = 0 {
     didSet {
       guard contentTopInsetOffset != oldValue else { return }
-      if hasLaidOut { isContentRegionChangePending = true }
+      if hasLaidOut {
+        isContentRegionChangePending = true
+      }
       contentAnimationLayouts = []
       setNeedsLayout()
     }
   }
+
   public var contentTopInset: CGFloat = 0 {
     didSet {
       guard contentTopInset != oldValue else { return }
-      if hasLaidOut { isContentRegionChangePending = true }
+      if hasLaidOut {
+        isContentRegionChangePending = true
+      }
       contentAnimationLayouts = []
       setNeedsLayout()
     }
   }
+
   public var scaleContent: Bool = true {
     didSet {
       guard scaleContent != oldValue else { return }
-      if hasLaidOut { isContentRegionChangePending = true }
+      if hasLaidOut {
+        isContentRegionChangePending = true
+      }
       setNeedsLayout()
     }
   }
@@ -166,9 +174,18 @@ public final class BottomSheetHostingView: UIView {
   let scrimView = BottomSheetScrimControl()
   var panGesture: SheetPanGestureRecognizer!
   var activeSpring: CriticalSpring?
+
+  /// Movement is published by position callbacks while a spring is active.
+  public var isSettling: Bool {
+    activeSpring != nil
+  }
+
   var activeSpringTargetIndex: Int = 0
   var activeSpringEmitsSettle = false
   var scrimPinnedFull = false
+  var pinnedContentInset: CGFloat?
+  var contentInsetTransition: (from: CGFloat, to: CGFloat, fromInset: CGFloat, toInset: CGFloat)?
+  var contentInsetAnchor: (position: CGFloat, inset: CGFloat)?
   private var displayLink: CADisplayLink?
   var pendingIndex: Int?
   var pendingSnapRequest: PendingSnapRequest?
@@ -647,6 +664,9 @@ public final class BottomSheetHostingView: UIView {
     interruptedSpringEmitsSettle = nil
     scrimPinnedFull = false
     lastAppliedMaxDetentHeight = .nan
+    pinnedContentInset = nil
+    contentInsetTransition = nil
+    contentInsetAnchor = nil
     stopDisplayLink()
     removeSettleAnimations()
     rawDetentSpecs = []

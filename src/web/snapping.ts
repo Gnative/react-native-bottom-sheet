@@ -1,4 +1,10 @@
 import { CriticalSpring } from './criticalSpring';
+import {
+  contentTopInsetAt,
+  contentTopInsetAtRest,
+  type ContentInsetMotion,
+  type DetentsHost,
+} from './detents';
 import type { BottomSheetWebCallbacks, ResolvedDetent } from './types';
 
 const FLICK_VELOCITY = 600;
@@ -11,21 +17,22 @@ const RELEASE_PROJECTION = 0.1;
 const DEFAULT_SETTLE_DURATION = 0.45;
 
 /** The controller's state and effects that snapping drives. */
-export type SnappingHost = {
-  readonly detents: ResolvedDetent[];
-  readonly hostHeight: number;
-  readonly translateY: number;
-  /** Seconds the settle spring takes. 0 uses the default. */
-  readonly settleDuration: number;
-  targetIndex: number;
-  pendingIndex: number | null;
-  scrimPinnedFull: boolean;
-  setTranslateY(ty: number): void;
-  requestFrame(): void;
-  emitPosition(): void;
-  updateCloseRequestRegistration(): void;
-  emit(event: (callbacks: BottomSheetWebCallbacks) => void): void;
-};
+export type SnappingHost = ContentInsetMotion &
+  Pick<DetentsHost, 'config' | 'statusBarOverlap'> & {
+    readonly detents: ResolvedDetent[];
+    readonly hostHeight: number;
+    readonly translateY: number;
+    /** Seconds the settle spring takes. 0 uses the default. */
+    readonly settleDuration: number;
+    targetIndex: number;
+    pendingIndex: number | null;
+    scrimPinnedFull: boolean;
+    setTranslateY(ty: number): void;
+    requestFrame(): void;
+    emitPosition(): void;
+    updateCloseRequestRegistration(): void;
+    emit(event: (callbacks: BottomSheetWebCallbacks) => void): void;
+  };
 
 export class SheetSnapping {
   private spring: CriticalSpring | null = null;
@@ -191,6 +198,26 @@ export class SheetSnapping {
     const currentTy =
       this.spring !== null ? this.cancelSpring(now) : host.translateY;
     const targetTy = this.translationY(index);
+    const position = host.hostHeight - currentTy;
+    const inset = contentTopInsetAt(host, position);
+    host.pinnedContentInset = null;
+    host.contentInsetTransition = null;
+    if (host.detents[index]!.position === 0) {
+      host.pinnedContentInset = inset;
+    } else if (position <= 0) {
+      host.pinnedContentInset = contentTopInsetAtRest(
+        host,
+        host.detents[index]!.position
+      );
+      host.contentInsetAnchor = null;
+    } else if (position !== host.detents[index]!.position) {
+      host.contentInsetTransition = {
+        from: position,
+        to: host.detents[index]!.position,
+        fromInset: inset,
+        toInset: contentTopInsetAtRest(host, host.detents[index]!.position),
+      };
+    }
     const distance = targetTy - currentTy;
     const settleDuration =
       host.settleDuration > 0 ? host.settleDuration : DEFAULT_SETTLE_DURATION;
@@ -219,6 +246,17 @@ export class SheetSnapping {
 
   cancelSpring(time = performance.now()) {
     const visualTy = this.currentTranslateY(time);
+    if (
+      this.host.pinnedContentInset != null ||
+      this.host.contentInsetTransition != null
+    ) {
+      this.host.contentInsetAnchor = {
+        position: this.host.hostHeight - visualTy,
+        inset: contentTopInsetAt(this.host, this.host.hostHeight - visualTy),
+      };
+      this.host.pinnedContentInset = null;
+      this.host.contentInsetTransition = null;
+    }
     this.spring = null;
     this.springEmitsSettle = false;
     this.host.setTranslateY(visualTy);
@@ -232,6 +270,9 @@ export class SheetSnapping {
     const emitSettle = this.springEmitsSettle;
     this.spring = null;
     this.springEmitsSettle = false;
+    host.pinnedContentInset = null;
+    host.contentInsetTransition = null;
+    host.contentInsetAnchor = null;
     host.setTranslateY(this.translationY(index));
     host.scrimPinnedFull = false;
     host.emitPosition();
