@@ -1,6 +1,6 @@
 {
   "name": "@gnative/react-native-bottom-sheet",
-  "version": "1.0.0-contours.0",
+  "version": "1.0.0-contours.1",
   "description": "Provides bottom-sheet components for React Native.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
