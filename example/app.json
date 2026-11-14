@@ -1,18 +1,11 @@
 {
   "expo": {
     "name": "React Native Bottom Sheet Example",
-    "slug": "@swmansion/react-native-bottom-sheet-example",
-    "version": "0.16.2-next.1",
-    "scheme": "react-native-bottom-sheet-example",
+    "slug": "react-native-bottom-sheet-example",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.swmansion.reactnativebottomsheet.example",
@@ -25,7 +18,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": true,
       "package": "com.swmansion.reactnativebottomsheet.example"
     },
     "web": {
@@ -33,7 +26,15 @@
     },
     "plugins": [
       "expo-router",
-      ["./plugins/withAndroidAppName", "React Native Bottom Sheet"]
+      ["./plugins/withAndroidAppName", "React Native Bottom Sheet"],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ]
     ]
   }
 }

@@ -1,0 +1,638 @@
+.example,
+.placeholder {
+  --example-border: var(--bs-line);
+  --example-background: var(--bs-subtle);
+  --example-surface: #fcfcff;
+  --example-muted-surface: var(--bs-neutral-fill);
+  --example-text: var(--bs-heading);
+  --example-muted: var(--bs-muted);
+  --example-log-component: var(--bs-accent);
+  --example-track: var(--bs-line);
+  --example-switch: var(--bs-accent);
+  --example-switch-tint: var(--bs-tint);
+  --example-switch-ink: var(--bs-accent);
+  --example-log-callback: #763e84;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.example,
+.placeholder {
+  margin-bottom: var(--ifm-leading);
+  border: 1px solid var(--bs-line-soft);
+  background-color: var(--example-background);
+  color: var(--example-text);
+}
+
+[data-theme='dark'] .example,
+[data-theme='dark'] .placeholder {
+  --example-surface: #2f3449;
+  --example-log-callback: #dda5e8;
+}
+
+/* The live sheet and the keyboard portal use the original example palette. */
+.stage,
+.theme {
+  --example-border: #c1c6e5;
+  --example-background: #f8f9ff;
+  color: var(--example-text);
+  --example-stage: #f8f9ff;
+  --example-sheet-line: #c1c6e5;
+  --example-surface: #fcfcff;
+  --example-scrap: var(--example-surface);
+  --example-muted-surface: #eef0ff;
+  --example-text: #001a72;
+  --example-muted: #6676aa;
+  --example-track: #c1c6e5;
+  --example-switch: #38acdd;
+  --example-button: #2196f3;
+  --example-tint-blue: #b5e1f1;
+  --example-tint-green: #dff2ec;
+  --example-tint-purple: #e8dafc;
+}
+
+[data-theme='dark'] .stage,
+[data-theme='dark'] .theme {
+  --example-border: #30354a;
+  --example-background: #232736;
+  --example-switch: #6fcef5;
+  --example-stage: #161925;
+  --example-surface: #2f3449;
+  --example-sheet-line: #4c5473;
+  --example-scrap: #abbcf5;
+  --example-muted-surface: #30354a;
+  --example-text: #f8f9ff;
+  --example-muted: #abbcf5;
+  --example-track: #30354a;
+  --example-tint-blue: #1b4865;
+  --example-tint-green: #2a4f4a;
+  --example-tint-purple: #473d68;
+}
+
+/* Reserves about the height of the example while it waits for the browser. */
+.placeholder {
+  height: var(--stage-height);
+}
+
+@media (max-width: 996px) {
+  .placeholder {
+    height: calc(var(--stage-height) + 280px);
+  }
+}
+
+/* Everything inside is out of flow: the panel animates between measured heights
+   and the column between its widths, while the stage stays put underneath. */
+.panel {
+  position: relative;
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+/* Spans the pane the controls sit in: the full width when they're under the
+   stage, the right column when they're beside it. The left padding lines the
+   reset icon up with the controls below. */
+.header {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px 16px 12px;
+  pointer-events: none;
+}
+
+.wide .header {
+  left: 59%;
+  padding-left: 20px;
+}
+
+.header > * {
+  pointer-events: auto;
+}
+
+.headerEnd {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-left: auto;
+}
+
+.tabs {
+  position: relative;
+  display: flex;
+  gap: 12px;
+}
+
+.tab {
+  padding: 0 0 3px;
+  border: 0;
+  background: none;
+  color: var(--example-muted);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.tabActive {
+  color: var(--example-text);
+}
+
+.tabIndicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background-color: var(--example-switch);
+  transition:
+    transform 200ms var(--ease-out),
+    width 200ms var(--ease-out);
+}
+
+.iconButton {
+  display: inline-flex;
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: var(--example-text);
+  cursor: pointer;
+  transition: transform 140ms var(--ease-out);
+}
+
+.iconButton:active {
+  transform: scale(0.9);
+}
+
+.tab:focus-visible,
+.iconButton:focus-visible,
+.slider:focus-visible,
+.segment:has(input:focus-visible),
+.logClear:focus-visible,
+.toggle:has(input:focus-visible) .toggleTrack {
+  outline: 2px solid var(--example-switch);
+  outline-offset: 2px;
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.stageSlot {
+  position: absolute;
+  top: 56px;
+  left: 0;
+  width: 100%;
+}
+
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--example-stage);
+  user-select: none;
+}
+
+/* Below the stage on small panels, set apart by a border. */
+.column {
+  position: absolute;
+  top: var(--stage-bottom);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--example-border);
+  background-color: var(--example-background);
+}
+
+.showCode .column {
+  top: 0;
+  border-top-color: transparent;
+}
+
+/* Beside the stage on wide panels. */
+.wide .stageSlot {
+  top: 0;
+  width: 59%;
+}
+
+.wide .column {
+  top: 0;
+  left: auto;
+  width: 41%;
+  border-top: 0;
+}
+
+.wide.showCode .column {
+  width: 100%;
+}
+
+/* Both panes keep the width they end up at, so nothing reflows in the column. */
+.controlsPane,
+.codePane {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.controlsPane {
+  width: 100cqw;
+  padding: 16px;
+}
+
+.wide .controlsPane {
+  width: 41cqw;
+  padding: 64px 20px 20px 24px;
+}
+
+.codePane {
+  width: 100cqw;
+  padding: 56px 16px 16px;
+  opacity: 0;
+}
+
+.codePane :global(.theme-code-block) {
+  margin-bottom: 0;
+  box-shadow: none;
+}
+
+.codePane [class*='buttonGroup'] {
+  display: none;
+}
+
+.showCode .controlsPane,
+.showCode .reset {
+  opacity: 0;
+}
+
+.showCode .codePane {
+  opacity: 1;
+}
+
+/* Enabled after the first paint, so examples load without moving. */
+.animated {
+  transition: height 300ms var(--ease-drawer);
+}
+
+.animated .column {
+  transition:
+    top 300ms var(--ease-drawer),
+    width 300ms var(--ease-drawer);
+}
+
+/* What leaves goes quickly, and what arrives follows as the column moves. */
+.animated .codePane {
+  transition: opacity 70ms ease-out;
+}
+
+.animated .controlsPane,
+.animated .reset {
+  transition: opacity 180ms ease-out 60ms;
+}
+
+.animated.showCode .codePane {
+  transition: opacity 180ms ease-out 80ms;
+}
+
+.animated.showCode .controlsPane,
+.animated.showCode .reset {
+  transition: opacity 70ms ease-out;
+}
+
+/* Controls */
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px 32px;
+  font-size: 14px;
+}
+
+.controlGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.controlLabel {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 500;
+}
+
+.controlValue {
+  color: var(--example-muted);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.meter {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background-color: var(--example-track);
+}
+
+.meterFill {
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  background-color: var(--example-switch);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.meterTick {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 12px;
+  margin-left: -1px;
+  background-color: var(--example-muted);
+}
+
+.hint {
+  margin: 0;
+  color: var(--example-muted);
+  line-height: 1.45;
+}
+
+.slider {
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  background: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 2px;
+  background-color: var(--example-track);
+}
+
+.slider::-moz-range-track {
+  height: 2px;
+  background-color: var(--example-track);
+}
+
+.slider::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -6px;
+  border-radius: 0;
+  background-color: var(--example-switch);
+  appearance: none;
+  transition: transform 140ms var(--ease-out);
+}
+
+.slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 0;
+  background-color: var(--example-switch);
+}
+
+/* A painted track is thicker, to show its colors. */
+.sliderPainted::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--slider-track);
+}
+
+.sliderPainted::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--slider-track);
+}
+
+.sliderPainted::-webkit-slider-thumb {
+  margin-top: -4px;
+  box-shadow: 0 0 0 2px var(--example-background);
+}
+
+.slider:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--example-border);
+  container-type: inline-size;
+}
+
+.segmentCompactLabel {
+  display: none;
+}
+
+/* Three segments this narrow can't fit a long label like "Percentage". */
+@container (max-width: 280px) {
+  .segmentFullLabel {
+    display: none;
+  }
+
+  .segmentCompactLabel {
+    display: inline;
+  }
+}
+
+.segment {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 8px;
+  color: var(--example-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.segment + .segment {
+  border-left: 1px solid var(--example-border);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .segment:hover {
+    background-color: var(--example-muted-surface);
+    color: var(--example-text);
+  }
+}
+
+.segment input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmentActive,
+.segmentActive:hover {
+  background-color: var(--example-switch-tint);
+  box-shadow: inset 0 -2px 0 var(--example-switch);
+  color: var(--example-switch-ink);
+  font-weight: 500;
+}
+
+.swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+.toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggleTrack {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  border: 1px solid var(--example-border);
+  background-color: var(--example-muted-surface);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.toggleTrack::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  background-color: var(--example-muted);
+  content: '';
+  transition:
+    transform 180ms var(--ease-out),
+    background-color 160ms ease;
+}
+
+.toggle input:checked + .toggleTrack {
+  border-color: var(--example-switch);
+  background-color: var(--example-switch);
+}
+
+.toggle input:checked + .toggleTrack::after {
+  background-color: var(--bs-on-accent);
+  transform: translateX(16px);
+}
+
+.logClear {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--example-muted);
+  font-family: var(--ifm-font-family-base);
+  font-size: 14px;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .logClear:hover {
+    color: var(--example-text);
+  }
+}
+
+/* Reads like the docs' code blocks: a flat, bordered panel of monospace text. */
+.log {
+  height: 104px;
+  margin: 0;
+  padding: 7px 10px;
+  overflow-y: auto;
+  border: 1px solid var(--bs-line-soft);
+  color: var(--example-text);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 13px;
+  list-style: none;
+}
+
+/* A new entry grows into place, easing the older ones down. It shows up almost
+   at once, so the event doesn't read as later than it fired. */
+.logEntry {
+  height: 22px;
+  margin: 0;
+  overflow: hidden;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    height 360ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 100ms ease-out;
+
+  @starting-style {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+.logCallback {
+  color: var(--example-log-callback);
+}
+
+.logComponent {
+  color: var(--example-log-component);
+}
+
+.logEmpty {
+  margin: 0;
+  color: var(--example-muted);
+  line-height: 22px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iconButton,
+  .slider::-webkit-slider-thumb,
+  .tabIndicator,
+  .toggleTrack::after {
+    transition: none;
+  }
+
+  .logEntry {
+    transition: opacity 100ms ease-out;
+  }
+
+  .animated,
+  .animated .column {
+    transition: none;
+  }
+}

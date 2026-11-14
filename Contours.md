@@ -4,15 +4,16 @@ This forked version adds serveral updates needed for Contours
 
 # Publishing
 
-Ensure you have an `.npmrc` file with credentials.
-GITHUB_TOKEN shoud lexport from your .bashrc file
+Ensure you have an `.npmrc` file with credentials. GITHUB_TOKEN shoud lexport
+from your .bashrc file
 
 ```
 @gnative:registry=https://npm.pkg.github.com
 //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
 ```
 
-1. Update package.json to use 
+1. Update package.json to use
+
 ```
 {
   "name": "@gnative/react-native-bottom-sheet",
@@ -26,8 +27,8 @@ GITHUB_TOKEN shoud lexport from your .bashrc file
   },
 }
 ```
-2. `npm publish`
 
+2. `npm publish`
 
 ## Surface geometry at the visibility boundary
 
@@ -66,9 +67,9 @@ The same visibility-boundary behavior applies to the surface corner radius:
 presentation uses the target visible detent's geometry, and dismissal uses the
 source visible detent's geometry.
 
-Initial presentation begins from a synthetic off-screen position. It must
-retain the target detent's geometry even when the configured detents do not
-include a zero-height detent.
+Initial presentation begins from a synthetic off-screen position. It must retain
+the target detent's geometry even when the configured detents do not include a
+zero-height detent.
 
 ## Native geometry is authoritative
 
@@ -114,8 +115,8 @@ Do not fire `onIndexChange` for this geometry-only movement.
 The callback responsibilities are intentionally distinct:
 
 - `onIndexChange` fires when a user drag commits to a detent. It is the signal
-  used to update the controlled `index`; it does not fire for programmatic
-  index changes.
+  used to update the controlled `index`; it does not fire for programmatic index
+  changes.
 - `onSettle` fires at the end of every completed snap, including user-driven,
   programmatic, initial, and dynamic-detent movements.
 - `onPositionChange` reports the live native position and fractional detent
@@ -124,26 +125,25 @@ The callback responsibilities are intentionally distinct:
 When `animateContentHeight` is disabled, an active `'content'` detent follows
 content-size changes immediately. The surface must still remain fully covered.
 
-## Gesture event lifecycle
+## Drag event lifecycle
 
-`onGestureStart` means the sheet's native pan recognizer has begun handling a
-drag; it is not a raw touch-down event. Emit it once per accepted pan.
-`onGestureEnd` means native pan handling ended, was cancelled, or failed. Emit
-it once for each emitted start, before any subsequent settle completes. Keep
-these events aligned across iOS and Android and do not emit them for purely
-programmatic snaps.
+`onDragStart` means the sheet's native pan recognizer has begun handling a drag;
+it is not a raw touch-down event. Emit it once per accepted pan. `onDragEnd`
+means native pan handling ended, was cancelled, or failed. Emit it once for each
+emitted start, before any subsequent settle completes. Keep these events aligned
+across iOS and Android and do not emit them for purely programmatic snaps.
 
 ## iOS navigation-transition stability
 
 Transient transforms applied by navigation controllers must not continuously
 alter the sheet's detent cap. Compute the sheet's window origin from the
 untransformed ancestor layout where possible, falling back to UIKit conversion
-only when necessary. Otherwise every navigation-animation frame can look like
-a geometry change and cancel or restart an active sheet spring.
+only when necessary. Otherwise every navigation-animation frame can look like a
+geometry change and cancel or restart an active sheet spring.
 
 Do not assign `frame` to the transformed iOS sheet container. Lay it out with
-`bounds` and a bottom-anchored `center`; `frame` is derived and unstable while
-a transform is active.
+`bounds` and a bottom-anchored `center`; `frame` is derived and unstable while a
+transform is active.
 
 ## Package identity and publishing
 
@@ -182,8 +182,8 @@ than cherry-picking it blindly.
 - `src/BottomSheet.tsx` defines the public callback contract and forwards raw
   detent specifications for native resolution.
 
-`detentSpacing` and per-detent surface masking are currently implemented on
-iOS. The Android prop setter is currently a no-op; do not claim cross-platform
+`detentSpacing` and per-detent surface masking are currently implemented on iOS.
+The Android prop setter is currently a no-op; do not claim cross-platform
 support unless Android receives an equivalent implementation.
 
 ### Regression checks
@@ -204,3 +204,61 @@ When changing detents, snapping, masking, or initial layout, verify:
 
 The first rendered presentation frame must already use the target spacing, and
 the last visible dismissal frame must still use the source spacing.
+
+## Main-based port: inset behavior
+
+On `contours-main-port`, upstream detent objects support `borderRadius`. Insets
+retain upstream card clipping and gap hit testing, but content is laid out at
+the full host width, at x=0, with scale 1 on iOS, Android and web. Content
+detent heights and measurement metadata must also remain unscaled. Add explicit
+child padding to keep text and controls clear of clipped edges. This shared card
+clipping is a deliberate difference from the old surface-only mask invariant
+above; the old masking architecture has not been ported yet. Other old Contours
+features are not yet fully ported on this branch.
+
+Per-detent `borderTopRadius` and `borderBottomRadius` override the uniform
+`borderRadius`. Each pair interpolates independently; an omitted pair inherits
+its matching `surfaceStyle` corners and zero keeps it square.
+
+### Optional content scaling
+
+`scaleContent` defaults to `true` to retain upstream inset scaling. Contours can
+pass `scaleContent={false}` to keep full-host content coordinates and unscaled
+height measurements, as described above. Both modes retain card clipping,
+per-detent radius interpolation, shadows, and gap hit testing. The per-detent
+corner-radius demo opts out of scaling and uses a contrasting background so its
+corners and gaps are visible.
+
+## Main-based fullscreen and safe-content behavior
+
+`'fullscreen'` is a distinct native detent kind. It fills the actual native host
+height, minus `fullscreenTopOffset` (default **0**, superseding the old fork's
+22-point default). Standard detents still obey `topInset` and the status-bar
+cap. Insets at the bottom shorten the card while keeping its configured top.
+
+Content protection is separate: `contentTopInset="safeArea"` reads the overlap
+of the actual window safe area with the host. A numeric value sets a
+host-coordinate boundary directly. Both default to no protection unless
+explicitly configured. The native content offset is
+`max(0, boundary - sheetTop)`; the surface is never translated by it. Native
+dragging and spring samples drive the content transform, without JS frame
+callbacks or per-frame Yoga padding updates. The tallest content viewport
+subtracts the protected area, including scaling in its measurement units.
+
+`contentTopInsetOffset` is a signed adjustment to that boundary (default **0**).
+For a 16-point handle inside the content wrapper, use:
+
+```tsx
+contentTopInset="safeArea"
+contentTopInsetOffset={-16}
+```
+
+With a 59-point safe area, the wrapper stops at 43 and the content below its
+16-point handle begins at 59. Boundaries are clamped inside the host. An inline
+host that does not overlap the top safe area needs no extra offset. Use the
+rendered handle height when content scaling is enabled.
+
+The fullscreen demo covers inline, portal modal and window-overlay hosts, direct
+opening, preview/fullscreen transitions, scrolling to the last row, optional
+safe-area protection and handle adjustment. Device checks for rotation,
+notched/non-notched devices and interrupted springs remain required.

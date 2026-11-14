@@ -9,16 +9,17 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
-import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
-import androidx.activity.OnBackPressedCallback
 import androidx.core.view.WindowCompat
 import com.facebook.react.bridge.LifecycleEventListener
+import com.facebook.react.common.LifecycleState
+import com.facebook.react.common.annotations.UnstableReactNativeAPI
 import com.facebook.react.config.ReactFeatureFlags
 import com.facebook.react.uimanager.JSPointerDispatcher
 import com.facebook.react.uimanager.JSTouchDispatcher
@@ -29,13 +30,17 @@ import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.uimanager.events.EventDispatcher
 import com.facebook.react.views.view.ReactViewGroup
+import com.swmansion.reactnativebottomsheet.closerequest.CloseRequestInputState
+import com.swmansion.reactnativebottomsheet.closerequest.OverlayCloseRequestController
+import com.swmansion.reactnativebottomsheet.closerequest.PortalCloseRequestController
+import com.swmansion.reactnativebottomsheet.closerequest.findActivity
 
 /**
  * Fabric-mounted bottom-sheet view. It is a thin coordinator around a single [BottomSheetHostView]
  * that does the real work (scrim, gestures, detents, layout, events).
  *
  * In the default (portal) mode the host is a full-size child of this view, so behavior is identical
- * to hosting the logic directly. In native-overlay mode the host is hoisted into a full-screen,
+ * to hosting the logic directly. In window-overlay mode the host is hoisted into a full-screen,
  * edge-to-edge, transparent dialog that floats above everything—including native modal
  * screens—letting the sheet escape the JS portal's React tree (see issue #16).
  *
@@ -48,14 +53,42 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
   private val themedReactContext = context as? ThemedReactContext
   private var overlayDialog: ComponentDialog? = null
   private var overlayRoot: BottomSheetDialogRootView? = null
-  private var nativeOverlay = false
+  private var windowOverlay = false
+  // When the sheet last opened, relative to other sheets (0 until it first opens).
+  private var openOrder = 0
   // Cached only while a dialog is present, so per-frame interaction callbacks
   // don't thrash the window flags.
   private var overlayInteractive: Boolean? = null
+  // The portal host this sheet is presented in, outside window-overlay mode, and whether the sheet
+  // currently blocks the screen behind it.
+  private var portalHost: BottomSheetPortalHostView? = null
+  private var isPresented = false
+
+  private var isViewAttached = false
+  private var isReactHostResumed = themedReactContext?.lifecycleState == LifecycleState.RESUMED
+  private val portalCloseRequestController =
+    PortalCloseRequestController(
+      view = this,
+      currentActivity = {
+        if (themedReactContext != null) {
+          themedReactContext.currentActivity
+        } else {
+          context.findActivity()
+        }
+      },
+      emitCloseRequest = ::emitCloseRequest,
+      openOrder = { openOrder },
+    )
+  private val overlayCloseRequestController =
+    OverlayCloseRequestController(emitCloseRequest = ::emitCloseRequest)
 
   init {
     pointerEvents = PointerEvents.BOX_NONE
-    host.interactionListener = { interactive -> updateOverlayTouchability(interactive) }
+    host.interactionListener = { interactive ->
+      updateOverlayTouchability(interactive)
+      updatePresented(interactive)
+    }
+    host.closeRequestStateChangedListener = ::refreshCloseRequestControllers
     attachHostInline()
     // The overlay dialog's window is bound to the host activity, so we follow the
     // activity lifecycle: tear the window down before the activity is destroyed
@@ -103,9 +136,28 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
 
   fun setDetents(raw: List<Map<String, Any>>) = host.setDetents(raw)
 
-  fun setDetentCornerRadius(values: List<Float>?) = host.setDetentCornerRadius(values)
-
   fun setIndex(newIndex: Int) = host.setIndex(newIndex)
+
+  /** Set by the view manager and applied once its whole props update has been processed. */
+  internal var pendingIndex: Int? = null
+
+  internal fun applyPendingIndex() {
+    val index = pendingIndex ?: return
+    pendingIndex = null
+    setIndex(index)
+  }
+
+  var contentTopInsetOffset: Double
+    get() = host.contentTopInsetOffset
+    set(value) { host.contentTopInsetOffset = value }
+
+  var contentTopInset: Double
+    get() = host.contentTopInset
+    set(value) { host.contentTopInset = value }
+
+  var scaleContent: Boolean
+    get() = host.scaleContent
+    set(value) { host.scaleContent = value }
 
   var animateIn: Boolean
     get() = host.animateIn
@@ -119,45 +171,107 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
       host.animateContentHeight = value
     }
 
-  var animationDurationMs: Float
-    get() = host.animationDurationMs
-    set(value) {
-      host.animationDurationMs = value
-    }
-
   var modal: Boolean
     get() = host.modal
     set(value) {
       host.modal = value
+      refreshCloseRequestControllers()
     }
 
-  var disableScrollableNegotiation: Boolean
-    get() = host.disableScrollableNegotiation
+  var scrollExpandCoordination: Int
+    get() = host.scrollExpandCoordination
     set(value) {
-      host.disableScrollableNegotiation = value
+      host.scrollExpandCoordination = value
     }
 
-  var extendUnderStatusBar: Boolean
-    get() = host.extendUnderStatusBar
+  var scrollCollapseCoordination: Int
+    get() = host.scrollCollapseCoordination
     set(value) {
-      host.extendUnderStatusBar = value
+      host.scrollCollapseCoordination = value
+    }
+
+  var settleDuration: Float
+    get() = host.settleDuration
+    set(value) {
+      host.settleDuration = value
     }
 
   fun setScrimColor(color: Int?) = host.setScrimColor(color)
 
-  fun setScrimOpacities(values: List<Float>) = host.setScrimOpacities(values)
+  fun setScrimAccessibilityLabel(label: String?) = host.setScrimAccessibilityLabel(label)
 
-  fun setSafeAreaTopInset(safeAreaTopInset: Double) = host.setSafeAreaTopInset(safeAreaTopInset)
+  fun setSurfaceCornerRadii(values: List<Float>) = host.setSurfaceCornerRadii(values)
 
-  fun setFullscreenTopOffset(fullscreenTopOffset: Double) =
-    host.setFullscreenTopOffset(fullscreenTopOffset)
-  fun setNativeOverlay(value: Boolean) {
-    if (value == nativeOverlay) return
-    nativeOverlay = value
-    if (value) presentOverlay() else dismissOverlay()
+  internal fun setSurfaceShadows(values: List<CardShadow>) = host.setSurfaceShadows(values)
+
+  fun setSurfaceElevation(value: Float) = host.setSurfaceElevation(value)
+
+  fun setSurfaceShadowColor(color: Int) = host.setSurfaceShadowColor(color)
+
+  /** The host keeps the value and refreshes the close request controllers when it changes. */
+  fun setHasCloseRequestHandler(value: Boolean) {
+    host.hasCloseRequestHandler = value
+  }
+
+  fun setWindowOverlay(value: Boolean) {
+    if (value == windowOverlay) return
+    windowOverlay = value
+    if (value) {
+      portalCloseRequestController.clear()
+      presentOverlay()
+    } else {
+      dismissOverlay()
+    }
+    refreshCloseRequestControllers()
+    updatePortalHost()
+  }
+
+  fun setOpenOrder(value: Int) {
+    if (value == openOrder) return
+    val didOpen = value > openOrder
+    openOrder = value
+    portalCloseRequestController.onOpenOrderChanged()
+    if (didOpen) bringOverlayToFront()
   }
 
   // MARK: - Inline vs overlay presentation
+
+  override fun onAttachedToWindow() {
+    super.onAttachedToWindow()
+    isViewAttached = true
+    overlayDialog?.let { dialog ->
+      overlayCloseRequestController.bind(dialog)
+    }
+    if (windowOverlay && overlayDialog == null) {
+      presentOverlay()
+    }
+    refreshCloseRequestControllers()
+    portalCloseRequestController.scheduleRoutingContextSync()
+    updatePortalHost()
+  }
+
+  override fun onDetachedFromWindow() {
+    isViewAttached = false
+    portalCloseRequestController.clear()
+    overlayCloseRequestController.unbind()
+    refreshCloseRequestControllers()
+    updatePortalHost()
+    super.onDetachedFromWindow()
+  }
+
+  override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+    super.onWindowFocusChanged(hasWindowFocus)
+    refreshCloseRequestControllers()
+  }
+
+  override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    // Portal Escape is intentionally resolved before `super`: an eligible portal behaves as a
+    // modal boundary, so a focused descendant cannot consume the sequence first. The
+    // OnUnhandledKeyEventListener remains only an outside-subtree fallback after normal dispatch
+    // leaves Escape unhandled.
+    if (portalCloseRequestController.dispatchEscape(event)) return true
+    return super.dispatchKeyEvent(event)
+  }
 
   override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
     super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -187,7 +301,7 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
     val activity = reactContext?.currentActivity
     if (activity == null || activity.isFinishing || activity.isDestroyed) {
       // Without an activity there is no window to host the dialog; stay inline.
-      nativeOverlay = false
+      windowOverlay = false
       return
     }
     (host.parent as? ViewGroup)?.removeView(host)
@@ -214,41 +328,54 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
     )
     dialog.setCancelable(false)
     dialog.window?.let { configureOverlayWindow(it, activity) }
-    // Stay unopinionated about the system back gesture, exactly like the inline
-    // (portal-based) modal, which registers no back handling and leaves it to the
-    // consumer. The dialog is a separate focusable window that would otherwise
-    // consume the back press and dismiss itself, so instead of acting on it we
-    // forward it to the host activity. That runs whatever the consumer wired up
-    // (JS `BackHandler`, React Navigation, …), just as a back press would for an
-    // inline modal.
-    dialog.onBackPressedDispatcher.addCallback(
-      dialog,
-      object : OnBackPressedCallback(true) {
-        override fun handleOnBackPressed() {
-          (activity as? ComponentActivity)?.onBackPressedDispatcher?.onBackPressed()
-        }
-      },
-    )
     overlayInteractive = null
     overlayRoot = root
     overlayDialog = dialog
+    overlayCloseRequestController.bind(dialog)
     try {
       dialog.show()
       dialog.window?.let { configureOverlayWindow(it, activity) }
+      // The host may already be interactive when an open inline sheet is moved into this dialog,
+      // so no interaction-listener transition is guaranteed after show(). Reapply the current
+      // state after the final window configuration resets the dialog to its safe initial flags.
+      overlayInteractive = host.isInteractive
+      presentedOverlays.add(this)
+      refreshCloseRequestControllers()
     } catch (_: RuntimeException) {
       // Show failed (e.g. the activity went away mid-present). Dismiss so the
       // partially-created window can't leak, then fall back to inline.
+      overlayCloseRequestController.unbind()
       runCatching { if (dialog.isShowing) dialog.dismiss() }
       overlayDialog = null
       overlayRoot = null
       overlayInteractive = null
-      nativeOverlay = false
+      windowOverlay = false
       (host.parent as? ViewGroup)?.removeView(host)
       attachHostInline()
     }
   }
 
+  /**
+   * Moves this overlay's window above the overlays presented after it, so the most recently opened
+   * sheet is in front. Windows stack in the order they are added, so the window is re-added. That
+   * happens as the sheet starts opening, while it is still off-screen.
+   */
+  private fun bringOverlayToFront() {
+    if (presentedOverlays.lastOrNull() === this) return
+    val window = overlayDialog?.window ?: return
+    val decorView = window.peekDecorView() ?: return
+    val windowManager = themedReactContext?.currentActivity?.windowManager ?: return
+    runCatching {
+      windowManager.removeViewImmediate(decorView)
+      windowManager.addView(decorView, window.attributes)
+      presentedOverlays.remove(this)
+      presentedOverlays.add(this)
+    }
+  }
+
   private fun dismissOverlay() {
+    presentedOverlays.remove(this)
+    overlayCloseRequestController.unbind()
     overlayDialog?.let { dialog ->
       (host.parent as? ViewGroup)?.removeView(host)
       if (dialog.isShowing) dialog.dismiss()
@@ -292,21 +419,20 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
     @Suppress("DEPRECATION")
     clearFlags(
       WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS or
-        WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION
+        WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION,
     )
     addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
 
     WindowCompat.setDecorFitsSystemWindows(this, false)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-      attributes =
-        attributes.apply {
-          layoutInDisplayCutoutMode =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-              WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            } else {
-              WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-            }
-        }
+      attributes = attributes.apply {
+        layoutInDisplayCutoutMode =
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+          } else {
+            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+          }
+      }
     }
 
     @Suppress("DEPRECATION")
@@ -335,54 +461,116 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
     }
   }
 
-  /**
-   * Toggles the overlay window's touchability/focusability with the sheet's interactivity. While
-   * the sheet is closed the window is transparent to touch and focus, so the screen behind stays
-   * usable; once it animates open or shows its scrim the window captures input (the scrim handles
-   * dismissal).
-   */
   private fun updateOverlayTouchability(interactive: Boolean) {
-    val window = overlayDialog?.window ?: return
     if (interactive == overlayInteractive) return
     overlayInteractive = interactive
-    if (interactive) {
-      window.clearFlags(NON_INTERACTIVE_FLAGS)
-    } else {
-      window.addFlags(NON_INTERACTIVE_FLAGS)
-    }
-    window.setOverlayWindowAlpha(interactive)
+    refreshCloseRequestControllers()
   }
 
   private fun Window.setOverlayWindowAlpha(interactive: Boolean) {
     attributes = attributes.apply { alpha = if (interactive) 1f else 0f }
   }
 
+  // MARK: - Accessibility modality
+
+  /**
+   * Keeps accessibility services out of the screen behind a presented modal sheet. The overlay
+   * dialog's window already does that in window-overlay mode; otherwise the portal host does it for
+   * the screen around it.
+   */
+  private fun updatePresented(presented: Boolean) {
+    if (presented == isPresented) return
+    isPresented = presented
+    portalHost?.setSheetModal(this, presented)
+  }
+
+  /** Finds the portal host this sheet is mounted in, leaving the previous one first. */
+  private fun updatePortalHost() {
+    val newHost =
+      if (isViewAttached && !windowOverlay) {
+        generateSequence(parent) { it.parent }
+          .filterIsInstance<BottomSheetPortalHostView>()
+          .firstOrNull()
+      } else {
+        null
+      }
+    if (newHost !== portalHost) {
+      portalHost?.setSheetModal(this, false)
+      portalHost = newHost
+    }
+    portalHost?.setSheetModal(this, isPresented)
+  }
+
+  // MARK: - Close request
+
+  /** Shared path for Back/Escape requests from portal and `windowOverlay` modes. */
+  private fun emitCloseRequest(): Boolean = host.performCloseRequest()
+
+  private fun refreshCloseRequestControllers() {
+    val state =
+      CloseRequestInputState(
+        isAttached = isViewAttached,
+        isLifecycleActive = isReactHostResumed,
+        isModal = modal,
+        handlesCloseRequests = host.handlesCloseRequests,
+        isPresentationActive = host.isCloseRequestPresentationActive,
+        isTargetResolvedAndOpen = host.isCloseRequestTargetResolvedAndOpen,
+      )
+    portalCloseRequestController.update(
+      state = state,
+      usesPortalPresentation = modal && !windowOverlay,
+    )
+    overlayCloseRequestController.update(
+      state = state,
+      usesOverlayDialog = windowOverlay,
+      isSheetInteractive = overlayInteractive == true,
+    )
+  }
+
   // MARK: - Activity lifecycle
 
   override fun onHostResume() {
+    isReactHostResumed = true
     // Restore the overlay if it was torn down while the activity was gone but the
     // sheet should still be presented above it.
-    if (nativeOverlay && overlayDialog == null) {
+    if (windowOverlay && overlayDialog == null) {
       presentOverlay()
     }
+    refreshCloseRequestControllers()
+    portalCloseRequestController.scheduleRoutingContextSync()
   }
 
-  override fun onHostPause() {}
+  override fun onHostPause() {
+    isReactHostResumed = false
+    refreshCloseRequestControllers()
+  }
 
   override fun onHostDestroy() {
+    isReactHostResumed = false
+    portalCloseRequestController.clear()
     // Dismiss before the activity's window token is destroyed to avoid a leaked
-    // window. `nativeOverlay` is left intact so `onHostResume` can restore it;
+    // window. `windowOverlay` is left intact so `onHostResume` can restore it;
     // the host falls back to inline parenting in the meantime.
     if (overlayDialog != null) {
       dismissOverlay()
+      refreshCloseRequestControllers()
     }
   }
 
   // MARK: - Cleanup
 
   fun destroy() {
+    isViewAttached = false
+    isReactHostResumed = false
+    portalCloseRequestController.dispose()
+    overlayCloseRequestController.dispose()
     themedReactContext?.removeLifecycleEventListener(this)
     host.interactionListener = null
+    host.closeRequestStateChangedListener = null
+    portalHost?.setSheetModal(this, false)
+    portalHost = null
+    isPresented = false
+    presentedOverlays.remove(this)
     overlayDialog?.let { if (it.isShowing) it.dismiss() }
     overlayDialog = null
     overlayRoot = null
@@ -391,6 +579,9 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
   }
 
   private companion object {
+    // Presented overlays, in window order: the last one is in front.
+    val presentedOverlays = mutableListOf<BottomSheetView>()
+
     const val NON_INTERACTIVE_FLAGS =
       WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
   }
@@ -460,13 +651,12 @@ private class BottomSheetDialogRootView(context: ThemedReactContext) :
     return super.onHoverEvent(event)
   }
 
+  @OptIn(UnstableReactNativeAPI::class)
   override fun onChildStartedNativeGesture(childView: View?, ev: MotionEvent) {
     eventDispatcher?.let { dispatcher ->
       // Sweeps the active touch marked by handleTouchEvent when a native child takes over the
-      // gesture. The 3-arg overload that performs the sweep only exists on RN 0.82+, so it is
-      // resolved through a compat shim (see JSTouchDispatcherCompat) that uses it when present
-      // and falls back to the 2-arg overload on RN 0.76-0.81 (issue #35).
-      jSTouchDispatcher.onChildStartedNativeGestureCompat(ev, dispatcher, reactContext)
+      // gesture.
+      jSTouchDispatcher.onChildStartedNativeGesture(ev, dispatcher, reactContext)
       jSPointerDispatcher?.onChildStartedNativeGesture(childView, ev, dispatcher)
     }
   }

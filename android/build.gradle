@@ -28,7 +28,13 @@ buildscript {
 
 
 apply plugin: "com.android.library"
-apply plugin: "kotlin-android"
+// AGP 9 ships built-in Kotlin support and registers the `kotlin` extension
+// itself. Applying the Kotlin plugin on top of it fails configuration with
+// "Cannot add extension with name 'kotlin'". Only apply it when nothing has
+// registered that extension yet.
+if (project.extensions.findByName('kotlin') == null) {
+  apply plugin: "kotlin-android"
+}
 
 apply plugin: "com.facebook.react"
 
@@ -40,9 +46,7 @@ android {
   defaultConfig {
     minSdkVersion getExtOrDefault("minSdkVersion")
     targetSdkVersion getExtOrDefault("targetSdkVersion")
-    // Ships the keep rule for the reflectively-resolved JSTouchDispatcher overload (see
-    // JSTouchDispatcherCompat.kt) to consuming apps' R8/ProGuard.
-    consumerProguardFiles "proguard-rules.pro"
+    testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
   }
 
   buildFeatures {
@@ -59,13 +63,38 @@ android {
     disable "GradleCompatible"
   }
 
+  testOptions {
+    unitTests {
+      includeAndroidResources = true
+    }
+  }
+
   compileOptions {
     sourceCompatibility JavaVersion.VERSION_1_8
     targetCompatibility JavaVersion.VERSION_1_8
   }
 }
 
+tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+  // Robolectric requires Java 21 when a unit test targets Android API 36.
+  javaLauncher = javaToolchains.launcherFor {
+    languageVersion = org.gradle.jvm.toolchain.JavaLanguageVersion.of(21)
+  }
+}
+
 dependencies {
   implementation "com.facebook.react:react-android"
+  // Minimum for predictive Back, including callback-addition and restarted-gesture fixes.
+  implementation "androidx.activity:activity:1.9.0"
+  // Used directly for ViewCompat Escape routing; matches Activity 1.9.0's Core dependency.
+  implementation "androidx.core:core:1.13.0"
   implementation "androidx.dynamicanimation:dynamicanimation:1.0.0"
+
+  androidTestImplementation "androidx.test:runner:1.7.0"
+  androidTestImplementation "androidx.test:core:1.7.0"
+  androidTestImplementation "androidx.test.ext:junit:1.3.0"
+
+  testImplementation "androidx.test.ext:junit:1.3.0"
+  testImplementation "junit:junit:4.13.2"
+  testImplementation "org.robolectric:robolectric:4.16.1"
 }

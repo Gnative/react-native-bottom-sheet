@@ -45,24 +45,34 @@
   _impl.animateContentHeight = animateContentHeight;
 }
 
-- (CGFloat)animationDurationMs
+- (CGFloat)contentTopInsetOffset
 {
-  return _impl.animationDurationMs;
+  return _impl.contentTopInsetOffset;
 }
 
-- (void)setAnimationDurationMs:(CGFloat)animationDurationMs
+- (void)setContentTopInsetOffset:(CGFloat)contentTopInsetOffset
 {
-  _impl.animationDurationMs = animationDurationMs;
+  _impl.contentTopInsetOffset = contentTopInsetOffset;
 }
 
-- (BOOL)debugSurfaceBorders
+- (CGFloat)contentTopInset
 {
-  return _impl.debugSurfaceBorders;
+  return _impl.contentTopInset;
 }
 
-- (void)setDebugSurfaceBorders:(BOOL)debugSurfaceBorders
+- (void)setContentTopInset:(CGFloat)contentTopInset
 {
-  _impl.debugSurfaceBorders = debugSurfaceBorders;
+  _impl.contentTopInset = contentTopInset;
+}
+
+- (BOOL)scaleContent
+{
+  return _impl.scaleContent;
+}
+
+- (void)setScaleContent:(BOOL)scaleContent
+{
+  _impl.scaleContent = scaleContent;
 }
 
 - (UIView *)sheetContainer
@@ -70,14 +80,44 @@
   return _impl.sheetContainer;
 }
 
-- (BOOL)disableScrollableNegotiation
+- (NSInteger)scrollExpandCoordination
 {
-  return _impl.disableScrollableNegotiation;
+  return _impl.scrollExpandCoordination;
 }
 
-- (void)setDisableScrollableNegotiation:(BOOL)disableScrollableNegotiation
+- (void)setScrollExpandCoordination:(NSInteger)scrollExpandCoordination
 {
-  _impl.disableScrollableNegotiation = disableScrollableNegotiation;
+  _impl.scrollExpandCoordination = scrollExpandCoordination;
+}
+
+- (NSInteger)scrollCollapseCoordination
+{
+  return _impl.scrollCollapseCoordination;
+}
+
+- (void)setScrollCollapseCoordination:(NSInteger)scrollCollapseCoordination
+{
+  _impl.scrollCollapseCoordination = scrollCollapseCoordination;
+}
+
+- (NSTimeInterval)settleDuration
+{
+  return _impl.settleDuration;
+}
+
+- (void)setSettleDuration:(NSTimeInterval)settleDuration
+{
+  _impl.settleDuration = settleDuration;
+}
+
+- (BOOL)hasCloseRequestHandler
+{
+  return _impl.hasCloseRequestHandler;
+}
+
+- (void)setHasCloseRequestHandler:(BOOL)hasCloseRequestHandler
+{
+  _impl.hasCloseRequestHandler = hasCloseRequestHandler;
 }
 
 - (BOOL)modal
@@ -95,9 +135,14 @@
   [_impl setDetents:raw];
 }
 
-- (void)setExtendUnderStatusBar:(BOOL)extendUnderStatusBar
+- (void)contentRegionStateDidCommit:(CGFloat)inset
 {
-  _impl.extendUnderStatusBar = extendUnderStatusBar;
+  [_impl contentRegionStateDidCommit:inset];
+}
+
+- (void)contentRegionLayoutDidApply
+{
+  [_impl contentRegionLayoutDidApply];
 }
 
 - (CGFloat)contentRegionInset
@@ -105,24 +150,9 @@
   return _impl.contentRegionInset;
 }
 
-- (void)setSafeAreaTopInset:(CGFloat)safeAreaTopInset
+- (CGFloat)surfaceOverflowHolding:(CGFloat)previous
 {
-  _impl.safeAreaTopInset = safeAreaTopInset;
-}
-
-- (void)setFullscreenTopOffset:(CGFloat)fullscreenTopOffset
-{
-  _impl.fullscreenTopOffset = fullscreenTopOffset;
-}
-
-- (void)setDetentSpacing:(NSArray<NSNumber *> *)detentSpacing
-{
-  [_impl setDetentSpacing:detentSpacing];
-}
-
-- (void)setDetentCornerRadius:(NSArray<NSNumber *> *)detentCornerRadius
-{
-  [_impl setDetentCornerRadius:detentCornerRadius];
+  return [_impl surfaceOverflowWithHolding:previous];
 }
 
 - (void)setDetentIndex:(NSInteger)newIndex
@@ -135,9 +165,29 @@
   _impl.scrimColor = color;
 }
 
-- (void)setScrimOpacities:(NSArray<NSNumber *> *)opacities
+- (void)setScrimAccessibilityLabel:(NSString *)label
 {
-  [_impl setScrimOpacities:opacities];
+  _impl.scrimAccessibilityLabel = label;
+}
+
+- (void)setSurfaceCornerRadii:(NSArray<NSNumber *> *)radii
+{
+  [_impl setSurfaceCornerRadii:radii];
+}
+
+- (void)setSurfaceCornerCurve:(NSString *)curve
+{
+  [_impl setSurfaceCornerCurve:curve];
+}
+
+- (void)setSurfaceShadows:(NSArray<NSDictionary *> *)shadows
+{
+  [_impl setSurfaceShadows:shadows];
+}
+
+- (CGFloat)currentContentOffsetX
+{
+  return _impl.currentContentOffsetX;
 }
 
 - (CGFloat)currentContentOffsetY
@@ -145,9 +195,19 @@
   return _impl.currentContentOffsetY;
 }
 
+- (CGFloat)currentContentScale
+{
+  return _impl.currentContentScale;
+}
+
 - (BOOL)isModalAccessibilityActive
 {
   return _impl.isModalAccessibilityActive;
+}
+
+- (BOOL)isPresented
+{
+  return _impl.isPresented;
 }
 
 - (void)mountChildComponentView:(UIView *)childView atIndex:(NSInteger)index
@@ -180,19 +240,19 @@
   [self.delegate bottomSheetView:self didChangeIndex:index];
 }
 
+- (void)bottomSheetHostingViewDidStartDrag:(BottomSheetHostingView *)view
+{
+  [self.delegate bottomSheetViewDidStartDrag:self];
+}
+
+- (void)bottomSheetHostingViewDidEndDrag:(BottomSheetHostingView *)view
+{
+  [self.delegate bottomSheetViewDidEndDrag:self];
+}
+
 - (void)bottomSheetHostingView:(BottomSheetHostingView *)view didSettle:(NSInteger)index
 {
   [self.delegate bottomSheetView:self didSettle:index];
-}
-
-- (void)bottomSheetHostingViewDidStartGesture:(BottomSheetHostingView *)view
-{
-  [self.delegate bottomSheetViewDidStartGesture:self];
-}
-
-- (void)bottomSheetHostingViewDidEndGesture:(BottomSheetHostingView *)view
-{
-  [self.delegate bottomSheetViewDidEndGesture:self];
 }
 
 - (void)bottomSheetHostingView:(BottomSheetHostingView *)view
@@ -210,6 +270,16 @@
 - (void)bottomSheetHostingViewDidLayout:(BottomSheetHostingView *)view
 {
   [self.delegate bottomSheetViewDidLayout:self];
+}
+
+- (void)bottomSheetHostingViewDidUpdateScrim:(BottomSheetHostingView *)view
+{
+  [self.delegate bottomSheetViewDidUpdateScrim:self];
+}
+
+- (void)bottomSheetHostingViewDidRequestClose:(BottomSheetHostingView *)view
+{
+  [self.delegate bottomSheetViewDidRequestClose:self];
 }
 
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event

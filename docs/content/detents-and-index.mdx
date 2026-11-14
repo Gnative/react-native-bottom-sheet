@@ -2,19 +2,62 @@
 title: Detents and index
 ---
 
+import {
+  DetentTypesExample,
+  FloatingCardExample,
+  IndexEventsExample,
+  ProgrammaticDetentExample,
+} from '@site/src/examples/detents-and-index';
+
 # Detents and index
 
-Detents are the points to which the sheet snaps. Each detent is either a number
-(a fixed height in pixels) or `'content'` (the sheet’s content height, capped by
-the available screen height). The default detents are `[0, 'content']`. Pass
-detents in ascending order, from shortest to tallest. Fixed detents can be
-taller than the measured content height, so `[0, 'content', 600]` lets a compact
-content-sized sheet expand to a larger surface.
+Detents are the heights to which the sheet snaps. Each detent is a number (a
+fixed height in React Native density-independent layout units—points on iOS and
+dp on Android), a percentage string such as `'30%'`, or `'content'` (the
+measured content height, capped by the available sheet height). The default
+detents are `[0, 'content']`.
 
-Sheet children are laid out in a flex container. For a full-height
-sheet, apply `flex: 1` to your content and use the `'content'` detent.
-`surface` is sized by the library, so `flex: 1` only ever belongs on your
-content, never on the surface:
+For example, `[0, 'content']` creates a content-sized sheet, `[0, 300]` keeps
+the open height fixed, and `['0%', '30%', '80%']` creates responsive heights.
+
+<DetentTypesExample />
+
+A detent can also be an object, which sets its options in one place:
+
+```tsx
+detents={[
+  0,
+  { value: 320, insets: { left: 16, right: 16, bottom: 32 } },
+  { value: '100%', programmatic: true },
+]}
+```
+
+`value` takes any of the forms above. The options are [`insets`](#insets),
+[`programmatic`](#programmatic-only-detents) and, on `ModalBottomSheet`,
+[`scrimOpacity`](modal-sheets#scrim). A detent that leaves out an option,
+including a bare value, takes that option’s default, so `300` and
+`{ value: 300 }` are the same detent.
+
+Percentage values from `0%` through `100%`, including decimals such as `12.5%`,
+resolve against the available sheet height and update when that height changes.
+The percentage syntax is unsigned and does not allow whitespace, so values such
+as `'-10%'` are invalid.
+
+`detents` must contain at least one item. Numeric detents must be finite and
+non-negative; the library throws an `Error` for values such as `-10`, `NaN`, or
+`Infinity` instead of correcting them. A numeric detent may be taller than the
+measured content or exceed the available height; native layout caps its resolved
+height to the available geometry.
+
+Pass detents in ascending order, from shortest to tallest. Detent forms can be
+mixed, but they must remain ordered by their resolved heights (plus their bottom
+[insets](#insets), if any) at every layout size your app supports. The library
+validates the resolved order during native layout.
+
+Sheet children are laid out in a flex container. For a full-height sheet, apply
+`flex: 1` to your content and use the `'content'` detent. `surface` is sized by
+the library, so `flex: 1` only ever belongs on your content, never on the
+surface:
 
 ```tsx
 <BottomSheet
@@ -29,13 +72,67 @@ content, never on the surface:
 </BottomSheet>
 ```
 
-By default, full-height detents are capped below the status bar. Set
-`extendUnderStatusBar` when the sheet should be allowed to occupy the full
-screen height:
+The flex container is as tall as the tallest detent the sheet can reach, so
+`flex: 1` content — including a `ScrollView` or `FlatList` — is laid out against
+the height the sheet can actually show. With `detents={[0, 500]}` a scrollable
+fills 500pt and scrolls all the way to its last item; with a `'content'` detent
+as the tallest, the container spans the full available height, so a filling
+scrollable resolves `'content'` to that height.
+
+## Insets
+
+A detent’s `insets` keep space around the sheet at that detent, so it can float
+as a card. They take optional `left`, `right`, `start`, `end`, and `bottom`
+values, all 0 by default, and the gaps blend as the sheet moves between detents.
+`left` and `right` are physical sides; `start` and `end` follow the layout
+direction, so `start` is the left in a left-to-right layout and the right in a
+right-to-left one, and they take precedence over the side they resolve to. On
+the web, the layout direction is the document’s. Each side must be a finite,
+non-negative number; the library throws an `Error` otherwise. A closed detent
+ignores its insets, so the card leaves through the gap with its shape intact.
+
+```tsx
+<ModalBottomSheet
+  detents={[
+    0,
+    { value: 320, insets: { left: 16, right: 16, bottom: 32 } },
+    '100%',
+  ]}
+  surfaceStyle={{ borderRadius: 28, borderCurve: 'continuous' }}
+  index={index}
+  onIndexChange={setIndex}
+  surface={/* ... */}
+>
+  {/* ... */}
+</ModalBottomSheet>
+```
+
+<FloatingCardExample />
+
+A detent’s value is the card’s height, and percentages resolve against the
+available space: the host’s height minus the [top inset](#top-inset) and that
+detent's bottom inset. So `'100%'` fills the space between the gaps and never
+covers them. Detents ascend by the position of the card’s top: its height plus
+its bottom inset. The surface and content are laid out once, against the widest
+card, and scaled uniformly to fit narrower ones, as with iOS sheets, so content
+never reflows as the card’s edges move. Touches in the gaps reach the scrim or
+whatever is behind the sheet.
+
+## Top inset
+
+`topInset` sets the minimum space between the sheet’s top and the host’s top,
+for every detent. It caps how tall the sheet can get, and is part of what
+percentages resolve against. It must be a finite, non-negative number; the
+library throws an `Error` otherwise.
+
+By default, the sheet stops below the status bar: `topInset` defaults to the
+part of the status bar that overlaps the host. It is measured from the host’s
+top, so a lower value goes partly under the status bar, and `0` lets the sheet
+occupy the full screen height:
 
 ```tsx
 <BottomSheet // Or `ModalBottomSheet`.
-  extendUnderStatusBar
+  topInset={0}
   index={index}
   onIndexChange={setIndex}
   surface={/* ... */}
@@ -46,18 +143,22 @@ screen height:
 
 ## Index events
 
-The `index` prop is a zero-based index into the `detents` array.
-`onIndexChange` and `onSettle` have different responsibilities:
+The `index` prop must be a finite, zero-based integer in the range
+`0..(detents.length - 1)`. Invalid indices and empty `detents` arrays throw an
+`Error` synchronously in JavaScript for both `BottomSheet` and
+`ModalBottomSheet`. `onIndexChange` and `onSettle` have different
+responsibilities:
 
-- `onIndexChange` fires when a user-triggered snap is _initiated_: the
-  moment a drag commits to a detent, before the animation settles. It does not
-  fire for programmatic `index` changes; you already know when you make those.
-  Treat it as the signal to update your controlled `index` state.
+- `onIndexChange` fires when a user-triggered snap is _initiated_: the moment a
+  drag commits to a detent, or when a
+  [close request](modal-sheets#close-requests) closes a modal sheet that has no
+  `onCloseRequest`, before the animation settles. It does not fire for
+  programmatic `index` changes; you already know when you make those. Treat it
+  as the signal to update your controlled `index` state.
 - `onSettle` fires when the sheet finishes snapping to a detent, regardless of
-  whether that snap was user-triggered or programmatic. It is the
-  signal for the _end_ of any movement. Use it for observability or side effects
-  (analytics, reacting to collapse, etc.), not for updating the controlled
-  `index` state.
+  whether that snap was user-triggered or programmatic. It is the signal for the
+  _end_ of any movement. Use it for observability or side effects (analytics,
+  reacting to collapse, etc.), not for updating the controlled `index` state.
 
 ```tsx
 const [index, setIndex] = useState(0);
@@ -65,7 +166,7 @@ const [index, setIndex] = useState(0);
 
 ```tsx
 <BottomSheet // Or `ModalBottomSheet`.
-  detents={[0, 300, 'content']} // Collapsed, 300 px, content height.
+  detents={[0, 300, 600]} // Collapsed, 300 layout units, 600 layout units.
   index={index}
   onIndexChange={setIndex} // Fires when a drag commits; keep state in sync.
   surface={/* ... */}
@@ -77,19 +178,40 @@ const [index, setIndex] = useState(0);
 </BottomSheet>
 ```
 
+<IndexEventsExample />
+
 Detents can also change over time. When you update `detents`, the sheet keeps
-the current index and animates to the updated detent height when needed.
+the current index and animates to the updated detent height when needed. If an
+update shortens the array, set a matching in-range `index` in the same render;
+the library does not clamp a now-out-of-range index, and throws an `Error` for
+it instead.
+
+### Initial presentation
+
+A sheet whose `index` selects an open detent when it first mounts, such as at
+app launch, animates in from closed. Set `animateIn={false}` to show it at that
+detent immediately. Opening a closed sheet always animates.
+
+## Where a drag ends
+
+When a drag ends, a release faster than 600 layout units per second moves one
+detent along in its direction. A slower release goes to the nearest detent,
+measured from where the sheet was heading: 0.1 seconds of the release speed is
+added to where it was let go. A gentle swipe toward the next detent therefore
+reaches it without travelling past the midpoint, while a drag that stops before
+it is let go resolves on where it stopped.
 
 ## Programmatic-only detents
 
-If you want a detent to be reachable only via code (not by dragging), use the
-object form or the `programmatic` helper. Programmatic detents are excluded from
-drag snapping but can still be targeted via `index` updates. If the closed
-detent is programmatic-only, tapping the scrim does not dismiss the sheet.
+If you want a detent to be reachable only via code (not by dragging), set
+`programmatic: true` on it. Programmatic detents are excluded from drag snapping
+but can still be targeted via `index` updates. If the closed detent is
+programmatic-only, a [close request](modal-sheets#close-requests) such as a
+scrim tap does not dismiss the sheet unless you handle `onCloseRequest`.
 
 ```tsx
 <BottomSheet
-  detents={[0, programmatic(300), 'content']}
+  detents={[0, { value: 300, programmatic: true }, 600]}
   index={index}
   onIndexChange={setIndex}
   surface={/* ... */}
@@ -100,3 +222,5 @@ detent is programmatic-only, tapping the scrim does not dismiss the sheet.
   {/* ... */}
 </BottomSheet>
 ```
+
+<ProgrammaticDetentExample />

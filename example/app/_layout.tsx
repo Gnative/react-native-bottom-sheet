@@ -18,39 +18,74 @@ export default function RootLayout() {
           >
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen
+              name="scrim-pressables"
+              options={{ title: 'Scrim press isolation', headerShown: false }}
+            />
+            <Stack.Screen
               name="basic-modal"
               options={{ title: 'Basic modal', headerShown: false }}
+            />
+            <Stack.Screen
+              name="accessible-dismissal"
+              options={{ title: 'Accessible dismissal', headerShown: false }}
+            />
+            <Stack.Screen
+              name="surface-style"
+              options={{ title: 'Surface style', headerShown: false }}
+            />
+            <Stack.Screen
+              name="detent-radii"
+              options={{ title: 'Per-detent corner radii', headerShown: false }}
+            />
+            <Stack.Screen
+              name="fullscreen-detents"
+              options={{ title: 'Fullscreen detents', headerShown: false }}
+            />
+            <Stack.Screen
+              name="corner-touches"
+              options={{ title: 'Corner touches', headerShown: false }}
+            />
+            <Stack.Screen
+              name="detached-sheet"
+              options={{ title: 'Detached sheet', headerShown: false }}
             />
             <Stack.Screen
               name="lazy-mounted-modal"
               options={{ title: 'Lazy mounted modal', headerShown: false }}
             />
             <Stack.Screen
-              name="native-overlay-modal"
+              name="window-overlay-modal"
               options={{
-                title: 'Native overlay modal',
+                title: 'Window overlay modal',
                 presentation: 'modal',
                 headerShown: true,
               }}
             />
             <Stack.Screen
-              name="native-overlay-nested"
+              name="window-overlay-nested"
               options={{
-                title: 'Native overlay nested mount',
+                title: 'Window overlay nested mount',
                 headerShown: false,
               }}
             />
             <Stack.Screen
-              name="native-overlay-full-height-list"
+              name="window-overlay-full-height-list"
               options={{
-                title: 'Native overlay full-height list',
+                title: 'Window overlay full-height list',
                 headerShown: false,
               }}
             />
             <Stack.Screen
-              name="native-overlay-keyboard-input"
+              name="window-overlay-keyboard-input"
               options={{
-                title: 'Native overlay keyboard input',
+                title: 'Window overlay keyboard input',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="close-request"
+              options={{
+                title: 'Close requests',
                 headerShown: false,
               }}
             />
@@ -59,8 +94,19 @@ export default function RootLayout() {
               options={{ title: 'Modal with ScrollView', headerShown: false }}
             />
             <Stack.Screen
+              name="draggable-grabber"
+              options={{ title: 'Draggable grabber', headerShown: false }}
+            />
+            <Stack.Screen
               name="modal-flat-list"
               options={{ title: 'Modal with FlatList', headerShown: false }}
+            />
+            <Stack.Screen
+              name="fixed-detent-scroll-view"
+              options={{
+                title: 'Fixed detent ScrollView',
+                headerShown: false,
+              }}
             />
             <Stack.Screen
               name="keyboard-content-detent"
@@ -79,10 +125,6 @@ export default function RootLayout() {
                 title: 'Per-detent scrim opacity',
                 headerShown: false,
               }}
-            />
-            <Stack.Screen
-              name="collapsed-surface"
-              options={{ title: 'Collapsed surface', headerShown: false }}
             />
             <Stack.Screen
               name="inline-detents"
@@ -112,19 +154,30 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="invalid-detents"
-              options={{ title: 'Invalid detents', headerShown: false }}
+              options={{ title: 'Invalid props', headerShown: false }}
             />
             <Stack.Screen
-              name="disable-scrollable-negotiation"
+              name="scroll-coordination"
               options={{
-                title: 'Disable scrollable negotiation',
+                title: 'Scroll coordination modes',
                 headerShown: false,
               }}
+            />
+            <Stack.Screen
+              name="scroll-interaction"
+              options={{ title: 'Scroll interaction', headerShown: false }}
             />
             <Stack.Screen
               name="programmatic-detent-drag"
               options={{
                 title: 'Programmatic detent drag',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="percentage-detents"
+              options={{
+                title: 'Numeric and percentage detents',
                 headerShown: false,
               }}
             />
@@ -137,11 +190,22 @@ export default function RootLayout() {
               options={{ title: 'Dynamic content height', headerShown: false }}
             />
             <Stack.Screen
+              name="z-indexed-content"
+              options={{
+                title: 'Content with zIndex children',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
               name="snap-callbacks"
               options={{
                 title: 'Snap lifecycle callbacks',
                 headerShown: false,
               }}
+            />
+            <Stack.Screen
+              name="settle-duration"
+              options={{ title: 'Settle duration', headerShown: false }}
             />
             <Stack.Screen
               name="no-animate-in"

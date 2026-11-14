@@ -1,6 +1,13 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { router } from 'expo-router';
-import { Text, TouchableOpacity, View } from 'react-native';
+import {
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -39,6 +46,21 @@ export const CloseButton = ({ onPress }: { onPress: () => void }) => (
   </TouchableOpacity>
 );
 
+// React Native for Web maps `shadowRadius` straight to the CSS blur radius,
+// which renders far tighter than the native shadow, and the downward offset
+// hides most of what remains below the sheet. Cast a softer shadow upward
+// instead.
+const SHEET_SHADOW = Platform.select<ViewStyle>({
+  web: { boxShadow: '0px -1px 11px rgba(0, 0, 0, 0.16)' },
+  default: {
+    shadowColor: '#000',
+    shadowOpacity: 0.19,
+    shadowRadius: 5.62,
+    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+  },
+});
+
 export const SheetBackground = ({
   children,
   style,
@@ -52,11 +74,7 @@ export const SheetBackground = ({
         backgroundColor: 'white',
         borderTopLeftRadius: 16,
         borderTopRightRadius: 16,
-        shadowColor: 'red',
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
-        elevation: 6,
-        shadowOffset: { height: 2 },
+        ...SHEET_SHADOW,
       },
       style,
     ]}
@@ -120,15 +138,19 @@ export const DemoScreen = ({
   title,
   children,
   sheet,
+  scrollableControls = false,
+  backgroundColor = 'white',
 }: {
   title: string;
   children: ReactNode;
   sheet?: ReactNode;
+  scrollableControls?: boolean;
+  backgroundColor?: string;
 }) => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'white' }}>
+    <View style={{ flex: 1, backgroundColor }}>
       <View
         style={{
           paddingTop: insets.top + 8,
@@ -136,7 +158,7 @@ export const DemoScreen = ({
           paddingBottom: 12,
           borderBottomWidth: 1,
           borderBottomColor: '#ededed',
-          backgroundColor: 'white',
+          backgroundColor,
           flexDirection: 'row',
           alignItems: 'center',
           gap: 12,
@@ -165,10 +187,23 @@ export const DemoScreen = ({
           paddingHorizontal: 20,
           paddingTop: 16,
           gap: 16,
-          backgroundColor: 'white',
+          backgroundColor,
         }}
       >
-        <View style={{ gap: 12 }}>{children}</View>
+        {scrollableControls ? (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              gap: 12,
+              paddingBottom: insets.bottom + 16,
+            }}
+            showsVerticalScrollIndicator={false}
+          >
+            {children}
+          </ScrollView>
+        ) : (
+          <View style={{ gap: 12 }}>{children}</View>
+        )}
       </View>
       {sheet}
     </View>

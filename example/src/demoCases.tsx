@@ -1,27 +1,40 @@
 export type CaseKey =
+  | 'scrim-pressables'
   | 'basic-modal'
+  | 'accessible-dismissal'
+  | 'surface-style'
+  | 'detent-radii'
+  | 'fullscreen-detents'
+  | 'corner-touches'
+  | 'detached-sheet'
   | 'lazy-mounted-modal'
-  | 'native-overlay-modal'
-  | 'native-overlay-nested'
-  | 'native-overlay-full-height-list'
-  | 'native-overlay-keyboard-input'
+  | 'window-overlay-modal'
+  | 'window-overlay-nested'
+  | 'window-overlay-full-height-list'
+  | 'window-overlay-keyboard-input'
+  | 'close-request'
   | 'modal-scroll-view'
+  | 'draggable-grabber'
   | 'modal-flat-list'
+  | 'fixed-detent-scroll-view'
   | 'keyboard-content-detent'
   | 'keyboard-aware-list'
   | 'scrim-opacity'
-  | 'collapsed-surface'
   | 'inline-detents'
   | 'under-status-bar'
   | 'content-larger-detent'
   | 'inline-flat-list'
   | 'inline-nested-flat-list'
   | 'invalid-detents'
-  | 'disable-scrollable-negotiation'
+  | 'scroll-coordination'
+  | 'scroll-interaction'
   | 'programmatic-detent-drag'
+  | 'percentage-detents'
   | 'dynamic-detents'
   | 'dynamic-content-height'
+  | 'z-indexed-content'
   | 'snap-callbacks'
+  | 'settle-duration'
   | 'no-animate-in'
   | 'ui-thread-position'
   | 'ui-thread-modal-position';
@@ -35,9 +48,44 @@ export type DemoCase = {
 
 export const DEMO_CASES: DemoCase[] = [
   {
+    key: 'scrim-pressables',
+    title: 'Scrim press isolation',
+    href: '/scrim-pressables',
+  },
+  {
     key: 'basic-modal',
     title: 'Basic modal',
     href: '/basic-modal',
+  },
+  {
+    key: 'accessible-dismissal',
+    title: 'Accessible dismissal',
+    href: '/accessible-dismissal',
+  },
+  {
+    key: 'surface-style',
+    title: 'Surface style (card shape)',
+    href: '/surface-style',
+  },
+  {
+    key: 'detent-radii',
+    title: 'Per-detent corner radii',
+    href: '/detent-radii',
+  },
+  {
+    key: 'fullscreen-detents',
+    title: 'Fullscreen surface and safe content',
+    href: '/fullscreen-detents',
+  },
+  {
+    key: 'corner-touches',
+    title: 'Corner touches',
+    href: '/corner-touches',
+  },
+  {
+    key: 'detached-sheet',
+    title: 'Detached sheet (gaps and insets)',
+    href: '/detached-sheet',
   },
   {
     key: 'lazy-mounted-modal',
@@ -45,24 +93,29 @@ export const DEMO_CASES: DemoCase[] = [
     href: '/lazy-mounted-modal',
   },
   {
-    key: 'native-overlay-modal',
-    title: 'Native overlay modal',
-    href: '/native-overlay-modal',
+    key: 'window-overlay-modal',
+    title: 'Window overlay modal',
+    href: '/window-overlay-modal',
   },
   {
-    key: 'native-overlay-nested',
-    title: 'Native overlay nested mount',
-    href: '/native-overlay-nested',
+    key: 'window-overlay-nested',
+    title: 'Window overlay nested mount',
+    href: '/window-overlay-nested',
   },
   {
-    key: 'native-overlay-full-height-list',
-    title: 'Native overlay full-height list',
-    href: '/native-overlay-full-height-list',
+    key: 'window-overlay-full-height-list',
+    title: 'Window overlay full-height list',
+    href: '/window-overlay-full-height-list',
   },
   {
-    key: 'native-overlay-keyboard-input',
-    title: 'Native overlay keyboard input',
-    href: '/native-overlay-keyboard-input',
+    key: 'window-overlay-keyboard-input',
+    title: 'Window overlay keyboard input',
+    href: '/window-overlay-keyboard-input',
+  },
+  {
+    key: 'close-request',
+    title: 'Close requests',
+    href: '/close-request',
   },
   {
     key: 'modal-scroll-view',
@@ -70,9 +123,19 @@ export const DEMO_CASES: DemoCase[] = [
     href: '/modal-scroll-view',
   },
   {
+    key: 'draggable-grabber',
+    title: 'Draggable grabber',
+    href: '/draggable-grabber',
+  },
+  {
     key: 'modal-flat-list',
     title: 'Modal with FlatList',
     href: '/modal-flat-list',
+  },
+  {
+    key: 'fixed-detent-scroll-view',
+    title: 'Fixed detent ScrollView',
+    href: '/fixed-detent-scroll-view',
   },
   {
     key: 'keyboard-content-detent',
@@ -88,11 +151,6 @@ export const DEMO_CASES: DemoCase[] = [
     key: 'scrim-opacity',
     title: 'Per-detent scrim opacity',
     href: '/scrim-opacity',
-  },
-  {
-    key: 'collapsed-surface',
-    title: 'Collapsed surface',
-    href: '/collapsed-surface',
   },
   {
     key: 'inline-detents',
@@ -121,19 +179,29 @@ export const DEMO_CASES: DemoCase[] = [
   },
   {
     key: 'invalid-detents',
-    title: 'Invalid detents',
+    title: 'Invalid props',
     href: '/invalid-detents',
     throws: true,
   },
   {
-    key: 'disable-scrollable-negotiation',
-    title: 'Disable scrollable negotiation',
-    href: '/disable-scrollable-negotiation',
+    key: 'scroll-coordination',
+    title: 'Scroll coordination modes',
+    href: '/scroll-coordination',
+  },
+  {
+    key: 'scroll-interaction',
+    title: 'Scroll interaction',
+    href: '/scroll-interaction',
   },
   {
     key: 'programmatic-detent-drag',
     title: 'Programmatic detent drag',
     href: '/programmatic-detent-drag',
+  },
+  {
+    key: 'percentage-detents',
+    title: 'Numeric and percentage detents',
+    href: '/percentage-detents',
   },
   {
     key: 'dynamic-detents',
@@ -146,9 +214,19 @@ export const DEMO_CASES: DemoCase[] = [
     href: '/dynamic-content-height',
   },
   {
+    key: 'z-indexed-content',
+    title: 'Content with zIndex children',
+    href: '/z-indexed-content',
+  },
+  {
     key: 'snap-callbacks',
     title: 'Snap lifecycle callbacks',
     href: '/snap-callbacks',
+  },
+  {
+    key: 'settle-duration',
+    title: 'Settle duration',
+    href: '/settle-duration',
   },
   {
     key: 'no-animate-in',

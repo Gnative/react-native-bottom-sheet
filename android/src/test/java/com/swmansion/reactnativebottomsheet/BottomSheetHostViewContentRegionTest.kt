@@ -1,0 +1,638 @@
+package com.swmansion.reactnativebottomsheet
+
+import android.app.Activity
+import android.content.Context
+import android.os.Looper
+import android.view.View
+import android.view.ViewGroup
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.facebook.react.R
+import com.facebook.react.bridge.ReadableNativeMap
+import com.facebook.react.bridge.WritableMap
+import com.facebook.react.common.mapbuffer.ReadableMapBuffer
+import com.facebook.react.internal.featureflags.ReactNativeFeatureFlagsForTests
+import com.facebook.react.uimanager.StateWrapper
+import java.time.Duration
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.Robolectric
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
+
+/**
+ * The content region — the Yoga box the sheet's in-flow children are laid out in — must be bounded
+ * by the tallest detent the sheet can reach, not by the detent cap alone. Otherwise a scrollable
+ * under a fixed tallest detent is laid out against the full cap and its last rows sit below the
+ * screen edge. The region is reported as `contentRegionInset`, the gap between the sheet's height
+ * and the region, in dp.
+ */
+@RunWith(AndroidJUnit4::class)
+@Config(sdk = [35], shadows = [TestArgumentsShadow::class])
+class BottomSheetHostViewContentRegionTest {
+  @Before
+  fun useLocalReactNativeFeatureFlags() {
+    ReactNativeFeatureFlagsForTests.setUp()
+  }
+
+  @Test
+  fun `fullscreen reserves content space while the surface reaches the host top`() {
+    withSheet(listOf(points(0.0), mapOf("value" to 1.0, "kind" to "fullscreen"))) { sheet ->
+      sheet.contentTopInset = 59.0
+      val surface = BottomSheetSurfaceView(sheet.context)
+      sheet.addSheetChild(surface, 0)
+      val content = RegionContentView(sheet.context)
+      sheet.addSheetChild(content, 1)
+      content.applyFabricMeasure(WIDTH_PX, HEIGHT_PX, fillsRegion = true)
+      layout(sheet)
+      sheet.stateWrapper = InsetRecordingStateWrapper()
+      sheet.commitContentRegion(HEIGHT_PX / sheet.density - 59.0)
+      sheet.setIndex(1)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      assertEquals(59.0, publishedInset(sheet), 0.001)
+      assertEquals(0f, surface.translationY, 0.01f)
+      assertEquals((59 * sheet.density).toFloat(), content.translationY, 0.5f)
+      sheet.contentTopInsetOffset = -16.0
+      layout(sheet)
+      sheet.commitContentRegion(HEIGHT_PX / sheet.density - 43.0)
+      shadowOf(Looper.getMainLooper()).idle()
+      assertEquals(43.0, publishedInset(sheet), 0.001)
+      assertEquals(0f, surface.translationY, 0.01f)
+      assertEquals((43 * sheet.density).toFloat(), content.translationY, 0.5f)
+    }
+  }
+
+  @Test
+  fun `fixed tallest detent bounds the content region`() {
+    withSheet(listOf(points(0.0), points(300.0))) { sheet ->
+      assertEquals(maxOf(0.0, HEIGHT_PX / sheet.density - 300.0), publishedInset(sheet), 0.001)
+    }
+  }
+
+  @Test
+  fun `percentage tallest detent bounds the content region to that share of the cap`() {
+    withSheet(listOf(points(0.0), percentage(0.5))) { sheet ->
+      assertEquals(HEIGHT_PX / sheet.density * 0.5, publishedInset(sheet), 0.001)
+    }
+  }
+
+  @Test
+  fun `content tallest detent keeps the whole cap as the content region`() {
+    withSheet(listOf(points(0.0), content())) { sheet ->
+      assertEquals(0.0, publishedInset(sheet), 0.001)
+    }
+  }
+
+  @Test
+  fun `fixed detent above a content detent bounds the content region`() {
+    withSheet(listOf(points(0.0), content(), points(300.0))) { sheet ->
+      assertEquals(maxOf(0.0, HEIGHT_PX / sheet.density - 300.0), publishedInset(sheet), 0.001)
+    }
+  }
+
+  @Test
+  fun `the insets of the tallest detent bound the content region`() {
+    val detent = { kind: String, value: Double ->
+      mapOf("value" to value, "kind" to kind, "insetTop" to 20.0, "insetBottom" to 40.0)
+    }
+    withSheet(listOf(points(0.0), detent("percentage", 1.0))) { sheet ->
+      assertEquals(60.0, publishedInset(sheet), 0.001)
+    }
+    withSheet(listOf(points(0.0), detent("content", 0.0))) { sheet ->
+      assertEquals(60.0, publishedInset(sheet), 0.001)
+    }
+    withSheet(listOf(points(0.0), detent("points", 300.0))) { sheet ->
+      assertEquals(HEIGHT_PX / sheet.density - 300.0, publishedInset(sheet), 0.001)
+    }
+  }
+
+  @Test
+  fun `fixed tallest detent above the cap leaves the whole cap as the content region`() {
+    withSheet(listOf(points(0.0), points(HEIGHT_PX / 2.0 * 3))) { sheet ->
+      assertEquals(0.0, publishedInset(sheet), 0.001)
+    }
+  }
+
+  @Test
+  fun `a narrow tallest card keeps an unscaled content region`() {
+    withSheet(narrowTallest("percentage", 1.0)) { sheet ->
+      val d = sheet.density
+      val scale = 1.0
+      assertEquals(HEIGHT_PX / d - HEIGHT_PX / d / scale, publishedInset(sheet), 0.001)
+    }
+  }
+
+  @Test
+  fun `a narrow trailing content detent's region is bounded by the space alone`() {
+    withSheet(narrowTallest("content", 0.0)) { sheet ->
+      val d = sheet.density
+      val scale = 1.0
+      assertEquals(HEIGHT_PX / d - HEIGHT_PX / d / scale, publishedInset(sheet), 0.001)
+
+      // The measurement can't feed back: a filling content's marker moves, the region doesn't.
+      val wrapper = InsetRecordingStateWrapper()
+      sheet.stateWrapper = wrapper
+      val content = RegionContentView(sheet.context)
+      sheet.addSheetChild(content, 0)
+      content.applyFabricMeasure(WIDTH_PX, (HEIGHT_PX / scale).toInt(), fillsRegion = true)
+      layout(sheet)
+      assertTrue(wrapper.insets.isEmpty())
+    }
+  }
+
+  @Test
+  fun `a narrow content detent resolves from content taller than the sheet`() {
+    withSheet(narrowTallest("content", 0.0)) { sheet ->
+      val d = sheet.density
+      val listener = RecordingSheetListener()
+      sheet.listener = listener
+      val scale = 1.0
+      // Unscaled content taller than the host is capped to the available height.
+      val measuredDp = HEIGHT_PX / d * 1.1
+      val content = RegionContentView(sheet.context)
+      sheet.addSheetChild(content, 0)
+      content.markerTopPx = (measuredDp * d).toInt()
+      content.applyFabricMeasure(WIDTH_PX, (HEIGHT_PX / scale).toInt(), fillsRegion = false)
+      layout(sheet)
+      sheet.stateWrapper = InsetRecordingStateWrapper()
+      sheet.commitContentRegion(HEIGHT_PX / d / scale)
+      sheet.setIndex(2)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      assertEquals(minOf(measuredDp * scale, HEIGHT_PX / d), listener.positions.last(), 0.5)
+    }
+  }
+
+  @Test
+  fun `the surface fills a narrow card without scaling`() {
+    withSheet(narrowTallest("percentage", 1.0)) { sheet ->
+      val d = sheet.density
+      val scale = 1.0
+      assertEquals(HEIGHT_PX / d / scale - HEIGHT_PX / d, publishedSurfaceOverflow(sheet), 0.001)
+    }
+  }
+
+  @Test
+  fun `the surface reaches the bottom of a narrow card below the tallest detent`() {
+    val detents =
+      listOf(
+        points(0.0),
+        mapOf(
+          "value" to 400.0,
+          "kind" to "points",
+          "insetLeft" to NARROW_SIDE,
+          "insetRight" to NARROW_SIDE,
+        ),
+        mapOf("value" to 500.0, "kind" to "points", "widestCard" to true),
+      )
+    withSheet(detents) { sheet ->
+      val d = sheet.density
+      val scale = 1.0
+      val layoutHeight = maxOf(HEIGHT_PX / d, 400.0 / scale)
+      assertEquals(layoutHeight - HEIGHT_PX / d, publishedSurfaceOverflow(sheet), 0.001)
+    }
+  }
+
+  @Test
+  fun `the surface keeps reaching the card's bottom until a shrink settles`() {
+    withSheet(narrowTallest("percentage", 1.0)) { sheet ->
+      val wrapper = InsetRecordingStateWrapper()
+      sheet.stateWrapper = wrapper
+      sheet.setIndex(2)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      val open = wrapper.surfaceOverflows.last()
+      assertEquals(0.0, open, 0.001)
+
+      sheet.setDetents(narrowTallest("points", 300.0))
+      assertEquals(open, wrapper.surfaceOverflows.last(), 0.001)
+
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      assertEquals(0.0, wrapper.surfaceOverflows.last(), 0.001)
+    }
+  }
+
+  @Test
+  fun `an unscaled surface fills the sheet`() {
+    withSheet(listOf(points(0.0), points(300.0), percentage(1.0))) { sheet ->
+      assertEquals(0.0, publishedSurfaceOverflow(sheet), 0.001)
+    }
+  }
+
+  @Test
+  fun `changing the tallest detent republishes the content region`() {
+    withSheet(listOf(points(0.0), points(300.0))) { sheet ->
+      val wrapper = InsetRecordingStateWrapper()
+      sheet.stateWrapper = wrapper
+      wrapper.insets.clear()
+
+      sheet.setDetents(listOf(points(0.0), points(600.0)))
+      shadowOf(Looper.getMainLooper()).idle()
+
+      assertEquals(HEIGHT_PX / sheet.density - 600.0, wrapper.insets.last(), 0.001)
+    }
+  }
+
+  // A detents change that alters the content region leaves the content's measured height stale
+  // until Fabric lays the content out against the new region. Resolving `'content'` from the stale
+  // value can trip the ascending-order validation (a fixed 500 above a filling scrollable that was
+  // measured in a 300 region), so the measurement must be treated as pending until the new region
+  // is applied.
+  @Test
+  fun `growing the content region via detents defers the stale content measurement`() {
+    withSheet(listOf(points(0.0), points(300.0))) { sheet ->
+      val listener = RecordingSheetListener()
+      sheet.listener = listener
+      val content = RegionContentView(sheet.context)
+      sheet.addSheetChild(content, 0)
+      // Fabric measured the filling content against the 300dp region: the marker sits at its end.
+      content.applyFabricMeasure(WIDTH_PX, (300 * sheet.density).toInt(), fillsRegion = true)
+      layout(sheet)
+      sheet.stateWrapper = InsetRecordingStateWrapper()
+      sheet.commitContentRegion(300.0)
+
+      // Must not throw: the stale 300dp measurement is below the new 500dp detent.
+      sheet.setDetents(listOf(points(0.0), points(500.0), content()))
+
+      // Fabric commits the new inset and re-measures the content against the full cap; the host
+      // then places the content at its new size.
+      content.applyFabricMeasure(WIDTH_PX, HEIGHT_PX, fillsRegion = true)
+      sheet.commitContentRegion(HEIGHT_PX / sheet.density)
+      shadowOf(Looper.getMainLooper()).idle()
+      assertEquals(HEIGHT_PX, content.height)
+
+      sheet.setIndex(2)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      assertEquals(2, listener.settles.last())
+      assertEquals(HEIGHT_PX / sheet.density, listener.positions.last(), 0.5)
+    }
+  }
+
+  @Test
+  fun `a detents change while detached still defers the stale content measurement`() {
+    withSheet(listOf(points(0.0), points(300.0))) { sheet ->
+      val content = RegionContentView(sheet.context)
+      sheet.addSheetChild(content, 0)
+      content.applyFabricMeasure(WIDTH_PX, (300 * sheet.density).toInt(), fillsRegion = true)
+      layout(sheet)
+      sheet.stateWrapper = InsetRecordingStateWrapper()
+      sheet.commitContentRegion(300.0)
+
+      val parent = sheet.parent as ViewGroup
+      parent.removeView(sheet)
+      // Must not throw even though no geometry can be pushed while detached.
+      sheet.setDetents(listOf(points(0.0), points(500.0), content()))
+      parent.addView(sheet, ViewGroup.LayoutParams(WIDTH_PX, HEIGHT_PX))
+      layout(sheet)
+    }
+  }
+
+  // In window-overlay mode the dialog window resizes on rotation before Fabric's batch arrives: the
+  // host is laid out at the new size while the content still holds its old measure, and the batch
+  // that then re-measures the content is the one that commits the new frame size. A content detent
+  // keeps the content-region inset at zero in both orientations, so only the committed frame size
+  // can tell the host the content was re-measured.
+  @Test
+  fun `rotating the overlay places the content once Fabric commits the new frame size`() {
+    withSheet(listOf(points(0.0), content())) { sheet ->
+      val content = RegionContentView(sheet.context)
+      sheet.addSheetChild(content, 0)
+      content.applyFabricMeasure(WIDTH_PX, HEIGHT_PX, fillsRegion = true)
+      layout(sheet)
+      sheet.stateWrapper = InsetRecordingStateWrapper()
+      sheet.commitState(WIDTH_PX, HEIGHT_PX, insetDp = 0.0)
+
+      // The dialog root lays the host out at the landscape size. The content keeps its portrait
+      // measure, and the pass the cap change posts runs before Fabric's batch, so it changes
+      // nothing.
+      layout(sheet, HEIGHT_PX, WIDTH_PX)
+      assertEquals(WIDTH_PX, content.width)
+
+      // Fabric's batch: the content is re-measured against the new frame but never laid out, and
+      // the committed state carries the new frame size with the inset unchanged.
+      content.applyFabricMeasure(HEIGHT_PX, WIDTH_PX, fillsRegion = true)
+      sheet.commitState(HEIGHT_PX, WIDTH_PX, insetDp = 0.0)
+
+      assertEquals(HEIGHT_PX, content.width)
+      assertEquals(WIDTH_PX, content.height)
+    }
+  }
+
+  @Test
+  fun `reverting the detents before Fabric commits releases the content measurement`() {
+    withSheet(listOf(points(0.0), points(300.0))) { sheet ->
+      val listener = RecordingSheetListener()
+      sheet.listener = listener
+      val content = RegionContentView(sheet.context)
+      sheet.addSheetChild(content, 0)
+      content.applyFabricMeasure(WIDTH_PX, (300 * sheet.density).toInt(), fillsRegion = true)
+      layout(sheet)
+      sheet.stateWrapper = InsetRecordingStateWrapper()
+      sheet.commitContentRegion(300.0)
+
+      sheet.setDetents(listOf(points(0.0), points(500.0), content()))
+      // Back to the committed 300dp region before Fabric applied the change: the content is still
+      // laid out against it, so its measurement is valid again and the content detent resolves to
+      // it (equal to the following fixed detent, which the ordering check allows).
+      sheet.setDetents(listOf(points(0.0), content(), points(300.0)))
+      sheet.setIndex(1)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      assertEquals(1, listener.settles.last())
+      assertEquals(300.0, listener.positions.last(), 0.5)
+    }
+  }
+
+  // `detents` and `index` arrive in one update, index last. While the content measurement is held,
+  // the resolved detents still have the previous count, so an index that only the new detents
+  // cover must be retained and replayed once they resolve instead of being dropped.
+  @Test
+  fun `an index added with the same detents update is replayed once the region applies`() {
+    withSheet(listOf(points(0.0), content(), points(560.0))) { sheet ->
+      val listener = RecordingSheetListener()
+      sheet.listener = listener
+      val content = RegionContentView(sheet.context)
+      sheet.addSheetChild(content, 0)
+      content.markerTopPx = (300 * sheet.density).toInt()
+      content.applyFabricMeasure(WIDTH_PX, (560 * sheet.density).toInt(), fillsRegion = false)
+      layout(sheet)
+      sheet.stateWrapper = InsetRecordingStateWrapper()
+      sheet.commitContentRegion(560.0)
+      sheet.setIndex(1)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      assertEquals(300.0, listener.positions.last(), 0.5)
+
+      sheet.setDetents(listOf(points(0.0), content(), points(600.0), points(700.0)))
+      sheet.setIndex(3)
+      content.applyFabricMeasure(WIDTH_PX, (700 * sheet.density).toInt(), fillsRegion = false)
+      sheet.commitContentRegion(700.0)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      assertEquals(3, listener.settles.last())
+      assertEquals(700.0, listener.positions.last(), 0.5)
+    }
+  }
+
+  @Test
+  fun `a retained index is replayed when the content measures after the region commit`() {
+    withSheet(listOf(points(0.0), content(), points(560.0))) { sheet ->
+      val listener = RecordingSheetListener()
+      sheet.listener = listener
+      val content = RegionContentView(sheet.context)
+      sheet.addSheetChild(content, 0)
+      content.markerTopPx = (300 * sheet.density).toInt()
+      content.applyFabricMeasure(WIDTH_PX, (560 * sheet.density).toInt(), fillsRegion = false)
+      layout(sheet)
+      sheet.stateWrapper = InsetRecordingStateWrapper()
+      sheet.commitContentRegion(560.0)
+      sheet.setIndex(1)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+
+      sheet.setDetents(listOf(points(0.0), content(), points(600.0), points(700.0)))
+      sheet.setIndex(3)
+      // The region commits while the content is momentarily unmeasurable (marker at 0), so the
+      // content detent cannot resolve yet; the measurement lands in a later layout pass.
+      content.moveMarker(0)
+      content.applyFabricMeasure(WIDTH_PX, (700 * sheet.density).toInt(), fillsRegion = false)
+      sheet.commitContentRegion(700.0)
+      content.moveMarker((300 * sheet.density).toInt())
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      assertEquals(3, listener.settles.last())
+      assertEquals(700.0, listener.positions.last(), 0.5)
+    }
+  }
+
+  @Test
+  fun `an index added with the detents while the initial open is deferred is not clamped`() {
+    val controller = Robolectric.buildActivity(Activity::class.java).setup()
+    val sheet = BottomSheetHostView(controller.get())
+    try {
+      val listener = RecordingSheetListener()
+      sheet.listener = listener
+      sheet.animateIn = true
+      sheet.setDetents(listOf(points(0.0), content(), points(560.0)))
+      sheet.setIndex(1)
+      val content = RegionContentView(sheet.context)
+      sheet.addSheetChild(content, 0)
+      // Unmeasurable content at first layout: the initial open at the content detent is deferred.
+      content.applyFabricMeasure(WIDTH_PX, (560 * sheet.density).toInt(), fillsRegion = false)
+      controller.get().setContentView(sheet, ViewGroup.LayoutParams(WIDTH_PX, HEIGHT_PX))
+      layout(sheet)
+      sheet.stateWrapper = InsetRecordingStateWrapper()
+      sheet.commitContentRegion(560.0)
+
+      sheet.setDetents(listOf(points(0.0), content(), points(600.0), points(700.0)))
+      sheet.setIndex(3)
+      content.applyFabricMeasure(WIDTH_PX, (700 * sheet.density).toInt(), fillsRegion = false)
+      sheet.commitContentRegion(700.0)
+      content.moveMarker((300 * sheet.density).toInt())
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      assertEquals(3, listener.settles.last())
+      assertEquals(700.0, listener.positions.last(), 0.5)
+    } finally {
+      sheet.destroy()
+      controller.close()
+    }
+  }
+
+  @Test
+  fun `content detent re-resolves once Fabric applies the changed content region`() {
+    withSheet(listOf(points(0.0), content(), points(560.0))) { sheet ->
+      val listener = RecordingSheetListener()
+      sheet.listener = listener
+      val content = RegionContentView(sheet.context)
+      sheet.addSheetChild(content, 0)
+      // Intrinsic 300dp content: its marker does not move when the region changes.
+      content.markerTopPx = (300 * sheet.density).toInt()
+      content.applyFabricMeasure(WIDTH_PX, (560 * sheet.density).toInt(), fillsRegion = false)
+      layout(sheet)
+      sheet.stateWrapper = InsetRecordingStateWrapper()
+      sheet.commitContentRegion(560.0)
+      sheet.setIndex(1)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      assertEquals(300.0, listener.positions.last(), 0.5)
+
+      sheet.setDetents(listOf(points(0.0), content(), points(600.0)))
+      content.applyFabricMeasure(WIDTH_PX, (600 * sheet.density).toInt(), fillsRegion = false)
+      sheet.commitContentRegion(600.0)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      assertEquals((600 * sheet.density).toInt(), content.height)
+      assertEquals(300.0, listener.positions.last(), 0.5)
+
+      sheet.setIndex(2)
+      shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(5))
+      assertEquals(2, listener.settles.last())
+      assertEquals(600.0, listener.positions.last(), 0.5)
+    }
+  }
+
+  private fun publishedInset(sheet: BottomSheetHostView): Double {
+    val wrapper = InsetRecordingStateWrapper()
+    sheet.stateWrapper = wrapper
+    return wrapper.insets.single()
+  }
+
+  private fun publishedSurfaceOverflow(sheet: BottomSheetHostView): Double {
+    val wrapper = InsetRecordingStateWrapper()
+    sheet.stateWrapper = wrapper
+    return wrapper.surfaceOverflows.single()
+  }
+
+  // The tallest card is narrower than the one below it, which the content is laid out against.
+  private fun narrowTallest(kind: String, value: Double): List<Map<String, Any>> =
+    listOf(
+      points(0.0),
+      mapOf(
+        "value" to 180.0,
+        "kind" to "points",
+        "insetLeft" to WIDE_SIDE,
+        "insetRight" to WIDE_SIDE,
+        "widestCard" to true,
+      ),
+      mapOf(
+        "value" to value,
+        "kind" to kind,
+        "insetLeft" to NARROW_SIDE,
+        "insetRight" to NARROW_SIDE,
+      ),
+    )
+
+  private val BottomSheetHostView.density: Double
+    get() = resources.displayMetrics.density.toDouble()
+
+  // Stands in for Fabric committing the pushed state back and completing the mount batch: the
+  // content is now laid out against a region of [regionDp], i.e. a content-region inset of the
+  // remaining height.
+  private fun BottomSheetHostView.commitContentRegion(regionDp: Double) {
+    commitState(WIDTH_PX, HEIGHT_PX, insetDp = HEIGHT_PX / density - regionDp)
+  }
+
+  // Stands in for Fabric committing the pushed state back and completing the mount batch: the
+  // sheet's frame is [widthPx] x [heightPx] and the content is laid out against a region inset by
+  // [insetDp].
+  private fun BottomSheetHostView.commitState(widthPx: Int, heightPx: Int, insetDp: Double) {
+    onStateCommitted(widthPx / density, heightPx / density, insetDp, 0.0)
+    shadowOf(Looper.getMainLooper()).idle()
+  }
+
+  private fun points(value: Double): Map<String, Any> = mapOf("value" to value, "kind" to "points")
+
+  private fun percentage(ratio: Double): Map<String, Any> =
+    mapOf("value" to ratio, "kind" to "percentage")
+
+  private fun content(): Map<String, Any> = mapOf("value" to 0.0, "kind" to "content")
+
+  private fun withSheet(detents: List<Map<String, Any>>, block: (BottomSheetHostView) -> Unit) {
+    val controller = Robolectric.buildActivity(Activity::class.java).setup()
+    val sheet = BottomSheetHostView(controller.get())
+    try {
+      sheet.animateIn = false
+      sheet.scaleContent = false
+      sheet.setDetents(detents)
+      sheet.setIndex(0)
+      controller.get().setContentView(sheet, ViewGroup.LayoutParams(WIDTH_PX, HEIGHT_PX))
+      layout(sheet)
+      block(sheet)
+    } finally {
+      sheet.destroy()
+      controller.close()
+    }
+  }
+
+  private fun layout(
+    sheet: BottomSheetHostView,
+    widthPx: Int = WIDTH_PX,
+    heightPx: Int = HEIGHT_PX,
+  ) {
+    sheet.measure(
+      View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY),
+      View.MeasureSpec.makeMeasureSpec(heightPx, View.MeasureSpec.EXACTLY),
+    )
+    sheet.layout(0, 0, widthPx, heightPx)
+    shadowOf(Looper.getMainLooper()).idle()
+  }
+
+  private companion object {
+    const val WIDTH_PX = 1080
+    const val HEIGHT_PX = 1920
+    const val WIDE_SIDE = 24.0
+    const val NARROW_SIDE = 64.0
+  }
+}
+
+private class RecordingSheetListener : BottomSheetViewListener {
+  val settles = mutableListOf<Int>()
+  val positions = mutableListOf<Double>()
+
+  override fun onIndexChange(index: Int) = Unit
+
+  override fun onSettle(index: Int) {
+    settles.add(index)
+  }
+
+  override fun onPositionChange(position: Double, index: Double) {
+    positions.add(position)
+  }
+
+  override fun onCloseRequest() = Unit
+}
+
+/**
+ * Stands in for the Fabric-measured content wrapper. The sheet owns its children's placement
+ * (`needsCustomLayoutForChildren`), so Fabric only measures the wrapper: [applyFabricMeasure] does
+ * the same, and the host's layout pass places it. Its tagged child is the marker the host measures
+ * content by: filling content keeps the marker at the region's end; intrinsic content pins it at
+ * [markerTopPx].
+ */
+private class RegionContentView(context: Context) : ViewGroup(context) {
+  private val marker =
+    View(context).apply {
+      setTag(R.id.view_tag_native_id, BottomSheetHostView.CONTENT_HEIGHT_MARKER_NATIVE_ID)
+    }
+  var markerTopPx = 0
+
+  init {
+    addView(marker)
+  }
+
+  fun applyFabricMeasure(widthPx: Int, heightPx: Int, fillsRegion: Boolean) {
+    if (fillsRegion) markerTopPx = heightPx
+    measure(
+      MeasureSpec.makeMeasureSpec(widthPx, MeasureSpec.EXACTLY),
+      MeasureSpec.makeMeasureSpec(heightPx, MeasureSpec.EXACTLY),
+    )
+  }
+
+  // Fabric re-laying the marker out on its own, as it does when the content above it changes.
+  fun moveMarker(topPx: Int) {
+    markerTopPx = topPx
+    marker.layout(0, topPx, 1, topPx + 1)
+  }
+
+  override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+    setMeasuredDimension(
+      MeasureSpec.getSize(widthMeasureSpec),
+      MeasureSpec.getSize(heightMeasureSpec),
+    )
+    marker.measure(
+      MeasureSpec.makeMeasureSpec(1, MeasureSpec.EXACTLY),
+      MeasureSpec.makeMeasureSpec(1, MeasureSpec.EXACTLY),
+    )
+  }
+
+  override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+    marker.layout(0, markerTopPx, 1, markerTopPx + 1)
+  }
+}
+
+private class InsetRecordingStateWrapper : StateWrapper {
+  val insets = mutableListOf<Double>()
+  val surfaceOverflows = mutableListOf<Double>()
+  override val stateData: ReadableNativeMap? = null
+  override val stateDataMapBuffer: ReadableMapBuffer? = null
+
+  override fun updateState(map: WritableMap) {
+    insets.add(map.getDouble("contentRegionInset"))
+    surfaceOverflows.add(map.getDouble("surfaceOverflow"))
+  }
+
+  override fun destroyState() = Unit
+}

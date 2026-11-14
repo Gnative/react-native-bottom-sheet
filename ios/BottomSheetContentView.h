@@ -7,8 +7,8 @@ NS_ASSUME_NONNULL_BEGIN
 @protocol BottomSheetContentViewDelegate <NSObject>
 - (void)bottomSheetView:(BottomSheetContentView *)view didChangeIndex:(NSInteger)index;
 - (void)bottomSheetView:(BottomSheetContentView *)view didSettle:(NSInteger)index;
-- (void)bottomSheetViewDidStartGesture:(BottomSheetContentView *)view;
-- (void)bottomSheetViewDidEndGesture:(BottomSheetContentView *)view;
+- (void)bottomSheetViewDidStartDrag:(BottomSheetContentView *)view;
+- (void)bottomSheetViewDidEndDrag:(BottomSheetContentView *)view;
 - (void)bottomSheetView:(BottomSheetContentView *)view
       didChangePosition:(CGFloat)position
                   index:(CGFloat)index;
@@ -17,6 +17,12 @@ NS_ASSUME_NONNULL_BEGIN
 // layer can push the content wrapper's target size (and, in overlay mode, the
 // sheet frame) into the shadow tree.
 - (void)bottomSheetViewDidLayout:(BottomSheetContentView *)view;
+// Fired when the scrim or the sheet's visibility is re-evaluated without the
+// sheet moving, e.g., after a `scrimOpacity` or `modal` change.
+- (void)bottomSheetViewDidUpdateScrim:(BottomSheetContentView *)view;
+// Fired when a scrim tap, the scrim's dismiss button, or VoiceOver's escape
+// gesture asks a sheet with an `onCloseRequest` handler to close.
+- (void)bottomSheetViewDidRequestClose:(BottomSheetContentView *)view;
 @end
 
 @interface BottomSheetContentView : UIView
@@ -24,28 +30,45 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, weak, nullable) id<BottomSheetContentViewDelegate> delegate;
 @property (nonatomic) BOOL animateIn;
 @property (nonatomic) BOOL animateContentHeight;
-@property (nonatomic) CGFloat animationDurationMs;
-@property (nonatomic) BOOL debugSurfaceBorders;
+@property (nonatomic) BOOL scaleContent;
+@property (nonatomic) CGFloat contentTopInset;
+@property (nonatomic) CGFloat contentTopInsetOffset;
 @property (nonatomic) BOOL modal;
-@property (nonatomic) BOOL disableScrollableNegotiation;
+@property (nonatomic) NSInteger scrollExpandCoordination;
+@property (nonatomic) NSInteger scrollCollapseCoordination;
+@property (nonatomic) NSTimeInterval settleDuration;
+@property (nonatomic) BOOL hasCloseRequestHandler;
 @property (nonatomic, readonly) UIView *sheetContainer;
 @property (nonatomic, readonly) BOOL isModalAccessibilityActive;
+// Whether the sheet is on screen, regardless of its scrim.
+@property (nonatomic, readonly) BOOL isPresented;
 
 - (void)setDetents:(NSArray<NSDictionary *> *)raw;
-// Whether full-height detents may extend under the status bar; feeds the
-// natively computed detent cap.
-- (void)setExtendUnderStatusBar:(BOOL)extendUnderStatusBar;
+// Records the content-region inset of a state Fabric committed.
+- (void)contentRegionStateDidCommit:(CGFloat)inset;
+// Notifies the host that a Fabric mounting transaction has finished applying
+// layout, so content laid out against the committed content-region inset is
+// measurable again.
+- (void)contentRegionLayoutDidApply;
 // The natively measured inset of the content region: the gap between the
-// sheet's height and the detent cap.
+// sheet's height and the content region's.
 - (CGFloat)contentRegionInset;
-- (void)setSafeAreaTopInset:(CGFloat)safeAreaTopInset;
-- (void)setFullscreenTopOffset:(CGFloat)fullscreenTopOffset;
-- (void)setDetentSpacing:(NSArray<NSNumber *> *)detentSpacing;
-- (void)setDetentCornerRadius:(NSArray<NSNumber *> *)detentCornerRadius;
+// How far the surface extends below the sheet, in layout units. A moving sheet
+// keeps at least `previous`, the overflow last reported.
+- (CGFloat)surfaceOverflowHolding:(CGFloat)previous;
 - (void)setDetentIndex:(NSInteger)newIndex;
 - (void)setScrimColor:(UIColor *_Nullable)color;
-- (void)setScrimOpacities:(NSArray<NSNumber *> *)opacities;
+- (void)setScrimAccessibilityLabel:(NSString *_Nullable)label;
+// Physical corner radii of the card (top-left, top-right, bottom-right,
+// bottom-left) and its corner curve ("circular" or "continuous").
+- (void)setSurfaceCornerRadii:(NSArray<NSNumber *> *)radii;
+- (void)setSurfaceCornerCurve:(NSString *)curve;
+// Outset card shadows: dictionaries of offsetX, offsetY, blurRadius,
+// spreadDistance, a UIColor (possibly dynamic), opacity and excludesInterior.
+- (void)setSurfaceShadows:(NSArray<NSDictionary *> *)shadows;
+- (CGFloat)currentContentOffsetX;
 - (CGFloat)currentContentOffsetY;
+- (CGFloat)currentContentScale;
 - (void)mountChildComponentView:(UIView *)childView atIndex:(NSInteger)index;
 - (void)unmountChildComponentView:(UIView *)childView;
 - (void)mountSurfaceComponentView:(UIView *)surfaceView atIndex:(NSInteger)index;

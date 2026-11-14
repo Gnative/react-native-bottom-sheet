@@ -2,6 +2,13 @@
 title: Modal sheets
 ---
 
+import {
+  CloseRequestExample,
+  LazyExample,
+  ScrimExample,
+  StackingExample,
+} from '@site/src/examples/modal-sheets';
+
 # Modal sheets
 
 `ModalBottomSheet` renders above other content with an optional scrim
@@ -26,10 +33,50 @@ const insets = useSafeAreaInsets();
 </ModalBottomSheet>
 ```
 
+## Lazy content
+
+By default, a sheet’s native view, `children` and `surface` stay mounted while
+it is closed. Set `lazy` to keep them in the tree only while the sheet is open:
+
+```tsx
+<ModalBottomSheet
+  lazy
+  index={index}
+  onIndexChange={setIndex}
+  surface={/* ... */}
+>
+  <ExpensiveContent />
+</ModalBottomSheet>
+```
+
+The sheet mounts in the same render that `index` selects an open detent, so its
+content is in place before it starts opening, and unmounts once it settles at a
+closed detent, so the content stays visible throughout the closing animation.
+Content state is reset each time the sheet opens. While unmounted, the sheet
+emits no `onPositionChange` events. `lazy` is also available on `BottomSheet`
+and has no effect when no detent is closed.
+
+<LazyExample />
+
+## Stacking
+
+When several modal sheets are open, the one opened most recently is on top,
+whatever order they appear in your tree. Reopening a sheet, even while it is
+still closing, brings it back to the top. `windowOverlay` sheets are always
+above portal sheets and stack among themselves the same way. Back and Escape go
+to the top sheet. A top sheet that does not act on them still blocks the portal
+sheets it covers, so they do not reach a covered sheet. The exception is a
+`windowOverlay` sheet on Android that does not act on Back: it forwards Back to
+the app, where a portal sheet can receive it (see
+[Presentation ordering](#presentation-ordering)).
+
+<StackingExample />
+
 ## Scrim
 
-Tapping the scrim collapses the sheet to the closed detent. Use `scrimColor` to
-customize the scrim color:
+Tapping the scrim is a [close request](#close-requests): by default, it
+collapses the sheet to the closed detent. Use `scrimColor` to customize the
+scrim color:
 
 ```tsx
 <ModalBottomSheet
@@ -43,46 +90,181 @@ customize the scrim color:
 ```
 
 By default, the scrim fades in as the sheet opens and then holds at full
-opacity, so detents above the first share the same scrim. Use `scrimOpacities`
-to control the opacity at each detent: It takes one value in 0–1 per detent,
-indexed to match `detents`, and interpolates linearly as the sheet is dragged
-between them. A shorter array reuses its last value for any
-remaining detents.
+opacity, so detents above the first share the same scrim. Set a detent’s
+`scrimOpacity` to control the opacity there: It takes a value from 0 through 1
+(the library throws an `Error` otherwise) and interpolates linearly as the sheet
+is dragged between detents.
 
-The default maps each detent to 0 when it is closed and 1 otherwise, so the
-scrim is transparent at any closed detent and fully opaque at every
-open one.
+A detent without `scrimOpacity` defaults to 0 when it is closed and 1 otherwise,
+so the scrim is transparent at any closed detent and fully opaque at every open
+one.
 
-To keep the scrim deepening across every detent, pass one value per detent:
+To keep the scrim deepening across every detent, lower it at the shorter open
+ones:
 
 ```tsx
 <ModalBottomSheet
   index={index}
   onIndexChange={setIndex}
-  detents={[0, 300, 'content']}
+  detents={[0, { value: 300, scrimOpacity: 0.5 }, 'content']}
   scrimColor="rgba(0, 0, 0, 0.3)"
-  scrimOpacities={[0, 0.5, 1]}
   surface={/* ... */}
 >
   {/* ... */}
 </ModalBottomSheet>
 ```
 
-## Native overlay
+<ScrimExample />
+
+### Accessible dismissal
+
+Screen reader users can ask the sheet to close the same way a scrim tap does.
+While tapping the scrim would ask the sheet to close, the scrim above the sheet
+is exposed as a “Dismiss” button to VoiceOver, TalkBack, and screen readers on
+the web. In addition:
+
+- On iOS, VoiceOver’s escape gesture (a two-finger Z) asks the sheet to close.
+- On Android, TalkBack offers a Dismiss action (in its actions menu) while focus
+  is inside the sheet’s content.
+
+These paths are [close requests](#close-requests), like a scrim tap. They
+require a visible scrim—one whose opacity at the current position is above 0,
+even when `scrimColor` is transparent—and either an `onCloseRequest` handler or
+a non-programmatic closed detent. While the scrim is visible but neither is
+there, VoiceOver’s escape gesture is consumed by the sheet instead of reaching
+the screen behind it. A sheet that fills its host leaves no scrim for the
+button, but the escape gesture and dismiss action remain.
+
+Use `scrimAccessibilityLabel` to localize the button’s label, which defaults to
+“Dismiss”:
+
+```tsx
+<ModalBottomSheet
+  index={index}
+  onIndexChange={setIndex}
+  scrimAccessibilityLabel={t('close')}
+  surface={/* ... */}
+>
+  {/* ... */}
+</ModalBottomSheet>
+```
+
+## Close requests
+
+A close request is the user asking an open sheet to close without dragging it:
+
+- A scrim tap.
+- A screen reader’s [dismiss action](#accessible-dismissal).
+- Android system Back or a committed predictive Back gesture.
+- A complete, unmodified physical-keyboard Escape press, on Android and the web.
+
+By default, a close request snaps the sheet to its closed detent and reports it
+through `onIndexChange`, as a drag to that detent would. That needs a visible
+scrim and a closed detent that is not `programmatic`; otherwise the request does
+nothing, and Back and Escape go on to the next sheet or the app.
+
+Set `onCloseRequest` to decide yourself. The callback reports the request but
+does not change the controlled `index`, choose a detent, or dismiss the sheet,
+so you can confirm first, close a sheet that has no closed detent, or ignore the
+request. Dragging the sheet closed is not a close request: it always reports
+through `onIndexChange`.
+
+To close a sheet in response, update `index` to a zero-height detent:
+
+```tsx
+const [index, setIndex] = useState(1);
+
+<ModalBottomSheet
+  detents={[0, 400]}
+  index={index}
+  onIndexChange={setIndex}
+  onCloseRequest={() => setIndex(0)}
+>
+  {/* content */}
+</ModalBottomSheet>;
+```
+
+<CloseRequestExample />
+
+### Input behavior
+
+A Back request is made after a regular Back action or predictive Back commit.
+Predictive gesture progress does not animate the sheet, and cancelling the
+gesture makes no request. Escape makes one request for a completed, unmodified
+physical-key press; modified, repeated, incomplete, or cancelled sequences make
+no additional requests.
+
+While a visible sheet animates to a closed target, it continues to consume
+Back/Escape input without another request until the animation settles. The next
+input is then routed to the next eligible sheet or to the host application. A
+no-op handler likewise consumes eligible input while leaving the sheet open.
+
+### Presentation ordering
+
+A sheet acts on Back and Escape when it has an `onCloseRequest` handler or can
+close by default (a visible scrim and a non-programmatic closed detent). A top
+sheet that does neither still blocks the sheets it covers.
+
+On the web, every open modal sheet follows the open order, and a top sheet that
+does not act on Escape leaves it to normal key handling.
+
+Portal presentations in the same Android window follow their open order. The
+topmost active portal receives the close request. A portal whose target is
+initially unresolved, already settled at zero height, or closed without a
+visible animation is skipped. A portal that is visibly animating closed remains
+active until settle, so a lower portal is not promoted early.
+
+An active top portal that does not act on close requests still blocks lower
+portals. Back continues beyond the portal group, while Escape remains available
+to normal key handling. `windowOverlay` is hosted in a separate window and does
+not participate in portal ordering. When it acts on close requests it forms the
+same modal boundary; otherwise it forwards Back to the host Activity and leaves
+Escape in normal key routing.
+
+That priority is retained while the top portal remains visibly closing. A portal
+that does not act on close requests continues to block lower ones until settle
+while preserving the same Back pass-through and normal Escape behavior.
+
+### Target eligibility
+
+Eligibility is based on the resolved native target height, not the detent index
+or current animated position. Numeric `0` and `0%`, programmatic or not, are
+closed targets. A `content` target becomes eligible only after measurement
+resolves it above zero. A sheet with no zero-height detent, such as
+`detents={[300, 600]}`, remains eligible at every target; the consumer can
+unmount it or change its detents if the close request should make it disappear.
+
+### Limitations
+
+Portal Escape handling is reliable while focus is inside the portal tree. When
+focus is elsewhere, a focused view can consume Escape first, so external-focus
+Escape is best effort. Use `windowOverlay` with `onCloseRequest` when Escape
+must be owned by a separate window.
+
+On Android API 24–27, the external-focus fallback is supported for standard
+React Native and AndroidX hosts based on `ReactActivity`, `AppCompatActivity`,
+or `ComponentActivity`. Custom hosts and custom window callbacks can intercept
+key events before the portal receives them.
+
+Inline `BottomSheet`, iOS physical-keyboard Escape, drag gestures, and
+programmatic index changes are not close requests.
+
+## Window overlay
 
 By default `ModalBottomSheet` renders through `BottomSheetProvider`’s portal.
 That portal lives in your React tree, so a sheet opened from a screen presented
 as a native modal (for example, a React Navigation native-stack screen with
 `presentation: 'modal'`) is confined to that screen and cannot cover it.
 
-Set `nativeOverlay` to present the sheet in a native overlay above
+Set `windowOverlay` to present the sheet in a window overlay above
 everything—including native modal screens—so it always covers the full window.
 On iOS, a `UIWindow`-attached container is used; on Android, a full-screen,
-edge-to-edge, transparent dialog.
+edge-to-edge, transparent dialog; on the web, a fixed-position layer in
+`document.body`.
 
 ```tsx
 <ModalBottomSheet
-  nativeOverlay
+  windowOverlay
   index={index}
   onIndexChange={setIndex}
   surface={/* ... */}
@@ -90,3 +272,57 @@ edge-to-edge, transparent dialog.
   {/* ... */}
 </ModalBottomSheet>
 ```
+
+## React context
+
+`BottomSheetProvider`’s portal renders the sheet’s content inside
+`BottomSheetProvider`, not where `ModalBottomSheet` appears in your tree.
+Content inside the sheet can read context from providers above
+`BottomSheetProvider`, but not from providers between `BottomSheetProvider` and
+the sheet. This also applies to navigation context: With `BottomSheetProvider`
+at the app root, `useNavigation()` inside the sheet does not see the screen that
+opened it.
+
+```tsx
+<ThemeContext.Provider value={theme}>
+  {/* Available inside sheets. */}
+  <BottomSheetProvider>
+    <UserContext.Provider value={user}>
+      {/* Not available inside sheets. */}
+      <Screen />
+    </UserContext.Provider>
+  </BottomSheetProvider>
+</ThemeContext.Provider>
+```
+
+When a provider cannot move above `BottomSheetProvider`, read the value in the
+component that renders the sheet and provide it again inside the sheet:
+
+```tsx
+const SheetOwner = () => {
+  const user = useContext(UserContext);
+  const [index, setIndex] = useState(0);
+
+  return (
+    <ModalBottomSheet
+      index={index}
+      onIndexChange={setIndex}
+      surface={/* ... */}
+    >
+      <UserContext.Provider value={user}>
+        <SheetContent />
+      </UserContext.Provider>
+    </ModalBottomSheet>
+  );
+};
+```
+
+The sheet stays in sync: When the value changes, `SheetOwner` re-renders and
+passes the updated content to the portal.
+
+Navigation context is internal to the navigation library, so pass what the sheet
+needs instead: Call `useNavigation()` in `SheetOwner` and hand the sheet content
+props or callbacks, such as `onSelect={() => navigation.goBack()}`.
+
+With `windowOverlay`, the sheet stays where it is rendered in the React tree and
+is moved natively, so it reads context from every provider above it.

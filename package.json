@@ -1,6 +1,6 @@
 {
   "name": "@gnative/react-native-bottom-sheet",
-  "version": "0.16.2-contours.9",
+  "version": "1.0.0-contours.0",
   "description": "Provides bottom-sheet components for React Native.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
@@ -18,7 +18,6 @@
     "android",
     "ios",
     "common",
-    "cpp",
     "*.podspec",
     "react-native.config.js",
     "!ios/build",
@@ -27,6 +26,8 @@
     "!android/gradlew",
     "!android/gradlew.bat",
     "!android/local.properties",
+    "!android/src/androidTest",
+    "!android/src/test",
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__",
@@ -36,57 +37,74 @@
     "example": "bun run --filter @swmansion/react-native-bottom-sheet-example",
     "clean": "del-cli lib",
     "prepare": "bob build",
-    "hooks:install": "lefthook install",
+    "test:android": "bun run test:android:prepare && bun run test:android:unit",
+    "test:android:prepare": "bun run --cwd example expo prebuild --platform android --no-install",
+    "test:android:instrumented:assemble": "./example/android/gradlew --project-dir example/android :swmansion_react-native-bottom-sheet:assembleDebugAndroidTest",
+    "test:android:instrumented": "./example/android/gradlew --project-dir example/android :swmansion_react-native-bottom-sheet:connectedDebugAndroidTest",
+    "test:android:unit": "./example/android/gradlew --project-dir example/android :swmansion_react-native-bottom-sheet:testDebugUnitTest",
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
+    "prepack": "bob build",
     "build": "bob build",
-    "prepack": "bob build"
+    "hooks:install": "lefthook install"
   },
   "keywords": [
     "react-native",
     "android",
-    "ios"
+    "ios",
+    "web"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/software-mansion-labs/react-native-bottom-sheet.git"
+    "url": "git+https://github.com/software-mansion/react-native-bottom-sheet.git"
   },
   "author": "Software Mansion",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/software-mansion-labs/react-native-bottom-sheet/issues"
+    "url": "https://github.com/software-mansion/react-native-bottom-sheet/issues"
   },
-  "homepage": "https://github.com/software-mansion-labs/react-native-bottom-sheet",
+  "homepage": "https://github.com/software-mansion/react-native-bottom-sheet",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
   "devDependencies": {
-    "@eslint/compat": "2.1.0",
-    "@eslint/eslintrc": "3.3.5",
-    "@eslint/js": "9.39.4",
-    "@react-native/babel-preset": "0.85.3",
-    "@react-native/eslint-config": "0.85.3",
-    "@types/react": "19.2.15",
+    "@eslint/compat": "2.1.1",
+    "@eslint/eslintrc": "3.3.7",
+    "@eslint/js": "9.39.5",
+    "@react-native/babel-preset": "0.88.0",
+    "@react-native/eslint-config": "0.88.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "babel-plugin-react-compiler": "1.0.0",
-    "del-cli": "6.0.0",
-    "eslint": "9.39.4",
+    "del-cli": "8.0.1",
+    "eslint": "9.39.5",
     "eslint-config-prettier": "10.1.8",
-    "eslint-plugin-prettier": "5.5.6",
-    "lefthook": "2.1.9",
-    "prettier": "3.8.3",
-    "react": "19.2.3",
-    "react-native": "0.85.3",
-    "react-native-builder-bob": "0.41.0",
-    "typescript": "5.9.3"
+    "eslint-plugin-prettier": "5.5.7",
+    "lefthook": "2.2.2",
+    "prettier": "3.9.10",
+    "react": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-builder-bob": "0.43.2",
+    "typescript": "6.0.3"
   },
   "peerDependencies": {
-    "react": ">=18.0.0",
-    "react-native": ">=0.76.0"
+    "react": ">=19.1.1",
+    "react-dom": ">=19.1.1",
+    "react-native": ">=0.82.0",
+    "react-native-web": ">=0.21.0"
+  },
+  "peerDependenciesMeta": {
+    "react-dom": {
+      "optional": true
+    },
+    "react-native-web": {
+      "optional": true
+    }
   },
   "workspaces": [
     "example"
   ],
-  "packageManager": "bun@1.3.14",
+  "packageManager": "bun@1.4.3",
   "react-native-builder-bob": {
     "source": "src",
     "output": "lib",
@@ -112,7 +130,9 @@
     "ios": {
       "componentProvider": {
         "BottomSheetView": "BottomSheetComponentView",
-        "BottomSheetSurfaceView": "BottomSheetSurfaceComponentView"
+        "BottomSheetSurfaceView": "BottomSheetSurfaceComponentView",
+        "BottomSheetContentWrapperView": "BottomSheetContentWrapperComponentView",
+        "BottomSheetPortalHostView": "BottomSheetPortalHostComponentView"
       }
     },
     "android": {

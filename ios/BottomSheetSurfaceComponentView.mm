@@ -3,7 +3,6 @@
 #import "../common/cpp/react/renderer/components/ReactNativeBottomSheetSpec/ComponentDescriptors.h"
 
 #import <React/RCTFabricComponentsPlugins.h>
-#import <react/renderer/components/ReactNativeBottomSheetSpec/Props.h>
 
 using namespace facebook::react;
 
@@ -12,7 +11,7 @@ using namespace facebook::react;
 - (instancetype)initWithFrame:(CGRect)frame
 {
   if (self = [super initWithFrame:frame]) {
-    static const auto defaultProps = std::make_shared<const BottomSheetSurfaceViewProps>();
+    const auto &defaultProps = BottomSheetSurfaceViewShadowNode::defaultSharedProps();
     _props = defaultProps;
   }
   return self;
@@ -21,18 +20,6 @@ using namespace facebook::react;
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
   return concreteComponentDescriptorProvider<BottomSheetSurfaceViewComponentDescriptor>();
-}
-
-- (void)layoutSubviews
-{
-  [super layoutSubviews];
-  UIView *contentView = self.contentView;
-  if (contentView != nil) {
-    contentView.frame = self.bounds;
-  }
-  for (UIView *subview in contentView.subviews) {
-    subview.frame = contentView.bounds;
-  }
 }
 
 @end

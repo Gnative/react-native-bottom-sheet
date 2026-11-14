@@ -2,146 +2,191 @@ package com.swmansion.reactnativebottomsheet
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
 import android.view.MotionEvent
-import android.view.VelocityTracker
 import android.view.View
-import android.view.ViewConfiguration
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.view.WindowInsets
+import androidx.core.view.NestedScrollingParent3
 import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.dynamicanimation.animation.DynamicAnimation
-import androidx.dynamicanimation.animation.SpringAnimation
-import androidx.dynamicanimation.animation.SpringForce
-import com.facebook.react.bridge.Arguments
 import com.facebook.react.uimanager.PointerEvents
-import com.facebook.react.uimanager.ReactPointerEventsView
-import com.facebook.react.uimanager.RootView
 import com.facebook.react.uimanager.StateWrapper
 import com.facebook.react.views.view.ReactViewGroup
-import kotlin.math.abs
-
-private enum class DetentKind {
-  POINTS,
-  CONTENT,
-  FULLSCREEN,
-}
-
-private data class RawDetentSpec(val value: Float, val kind: DetentKind, val programmatic: Boolean)
-
-private data class DetentSpec(val height: Float, val programmatic: Boolean)
+import com.swmansion.reactnativebottomsheet.closerequest.CloseRequestPresentationTracker
+import com.swmansion.reactnativebottomsheet.host.Card
+import com.swmansion.reactnativebottomsheet.host.ContentRegion
+import com.swmansion.reactnativebottomsheet.host.DetentInsets
+import com.swmansion.reactnativebottomsheet.host.Detents
+import com.swmansion.reactnativebottomsheet.host.Gestures
+import com.swmansion.reactnativebottomsheet.host.Scrim
+import com.swmansion.reactnativebottomsheet.host.ScrollCoordination
+import com.swmansion.reactnativebottomsheet.host.SheetHost
+import com.swmansion.reactnativebottomsheet.host.SheetState
+import com.swmansion.reactnativebottomsheet.host.Snapping
 
 interface BottomSheetViewListener {
   fun onIndexChange(index: Int)
 
   fun onSettle(index: Int)
 
-  fun onGestureStart()
+  fun onDragStart() = Unit
 
-  fun onGestureEnd()
+  fun onDragEnd() = Unit
 
   fun onPositionChange(position: Double, index: Double)
+
+  fun onCloseRequest()
 }
 
-class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
+class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScrollingParent3 {
 
   // MARK: - Listener
 
   var listener: BottomSheetViewListener? = null
 
-  // The state wrapper can arrive after geometry has already been derived
-  // (mount ordering is not guaranteed), so flush the current snapshot and
-  // re-derive on assignment; pushes dedup, so this is cheap when nothing was
-  // pending.
-  var stateWrapper: StateWrapper? = null
+  var stateWrapper: StateWrapper?
+    get() = contentRegion.stateWrapper
     set(value) {
-      field = value
-      if (value != null) {
-        pushStateSnapshot()
-        recomputeNativeGeometry()
-      }
+      contentRegion.stateWrapper = value
     }
 
   /**
    * Notified whenever the sheet's interactivity changes (true while it is animating, being dragged,
-   * or showing its scrim). In native-overlay mode the coordinator uses this to toggle the host
-   * dialog window's touchability so taps fall through to the screen behind while the sheet is
+   * or presented at an open detent). In window-overlay mode the coordinator uses this to toggle the
+   * host dialog window's touchability so taps fall through to the screen behind while the sheet is
    * closed.
    */
   var interactionListener: ((Boolean) -> Unit)? = null
 
-  // MARK: - State
-
-  private var rawDetentSpecs: List<RawDetentSpec> = emptyList()
-  private var detentSpecs: List<DetentSpec> = emptyList()
-  private var targetIndex: Int = 0
-  var animateIn: Boolean = true
-  var animateContentHeight: Boolean = true
-  var animationDurationMs: Float = 450f
-    set(value) {
-      field = value.coerceAtLeast(1f)
-    }
-  var modal: Boolean = false
+  /**
+   * Invokes the callback immediately when assigned and whenever later host state can change close
+   * request qualification.
+   */
+  var closeRequestStateChangedListener: (() -> Unit)? = null
     set(value) {
       field = value
-      updateInteractionState()
-      updateScrim()
+      value?.invoke()
     }
 
-  var disableScrollableNegotiation: Boolean = false
-  private var pendingIndex: Int? = null
-  private var hasLaidOut = false
-  private var isPanning = false
-  private var panStartingIndex: Int? = null
-  private var activeDragRange: ClosedFloatingPointRange<Float>? = null
-  private var activeDragDetentSpecs: List<DetentSpec>? = null
+  // MARK: - State
+
+  var contentTopInsetOffset: Double
+    get() = state.contentTopInsetOffset.toDouble() / state.density
+    set(value) {
+      val nativeValue = (value * state.density).toFloat()
+      if (state.contentTopInsetOffset == nativeValue) return
+      state.contentTopInsetOffset = nativeValue
+      if (state.hasLaidOut) contentRegion.isContentRegionChangePending = true
+      contentRegion.recomputeNativeGeometry()
+      requestLayout()
+    }
+
+  var contentTopInset: Double
+    get() = if (state.contentTopInset < 0f) -1.0 else state.contentTopInset.toDouble() / state.density
+    set(value) {
+      val nativeValue = if (value < 0) -1f else (value * state.density).toFloat()
+      if (state.contentTopInset == nativeValue) return
+      state.contentTopInset = nativeValue
+      if (state.hasLaidOut) contentRegion.isContentRegionChangePending = true
+      contentRegion.recomputeNativeGeometry()
+      requestLayout()
+    }
+
+  var scaleContent: Boolean
+    get() = state.scaleContent
+    set(value) {
+      if (state.scaleContent == value) return
+      state.scaleContent = value
+      if (state.hasLaidOut) contentRegion.isContentRegionChangePending = true
+      contentRegion.recomputeNativeGeometry()
+      requestLayout()
+    }
+
+  var animateIn: Boolean = true
+  var animateContentHeight: Boolean
+    get() = state.animateContentHeight
+    set(value) {
+      state.animateContentHeight = value
+    }
+
+  var modal: Boolean
+    get() = state.modal
+    set(value) {
+      state.modal = value
+      // The scrim first: the Dismiss button refreshed by updateInteractionState reads it.
+      scrim.updateScrim()
+      updateInteractionState()
+    }
+
+  var scrollExpandCoordination: Int
+    get() = state.scrollExpandCoordination
+    set(value) {
+      state.scrollExpandCoordination = value
+    }
+
+  var scrollCollapseCoordination: Int
+    get() = state.scrollCollapseCoordination
+    set(value) {
+      state.scrollCollapseCoordination = value
+    }
+
+  var settleDuration: Float
+    get() = state.settleDuration
+    set(value) {
+      state.settleDuration = value
+    }
 
   // MARK: - Internal
 
-  // The host remains un-clipped for elevation/shadows. This translated inner
-  // container clips only the visible surface and React content.
-  private val sheetContainer = TopRoundedClipFrameLayout(context)
-  private val scrimPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-  private var activeAnimation: SpringAnimation? = null
-  private var activeAnimationEmitsSettle = false
-  private var velocityTracker: VelocityTracker? = null
-  private val density = context.resources.displayMetrics.density
-  private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+  private val sheetContainer = BottomSheetCardContainer(context)
+  private val clipContainer = BottomSheetCardClipLayout(context)
+  private val state = SheetState(this, sheetContainer)
+  private val sheetHost: SheetHost =
+    object : SheetHost {
+      override val listener: BottomSheetViewListener?
+        get() = this@BottomSheetHostView.listener
 
-  // Touch tracking
-  private var initialTouchY = 0f
-  private var initialTouchX = 0f
-  private var lastTouchY = 0f
-  private var activePointerId = MotionEvent.INVALID_POINTER_ID
-  private var scrimPressed = false
-  private var scrimTouchActive = false
-  private var scrimColor = Color.TRANSPARENT
-  // The JS layer always supplies a per-detent array; the fully-opaque fallback
-  // only guards against empty input (indexing requires a non-empty array).
-  private var scrimOpacities = listOf(1f)
-  private var scrimProgress = 0f
-  private var suppressScrimForClosingTarget = false
-  private var scrimPinnedFull = false
-  private var safeAreaTopInset = 0f
-  // Keep this in sync with Fabric's codegen default. When JavaScript supplies
-  // zero, Fabric can omit the setter if both its old and new props are zero.
-  private var fullscreenTopOffset = 0f
-  private var contentHeightMarker: View? = null
-  private var surfaceView: View? = null
-  private var detentCornerRadii: List<Float> = emptyList()
-  private var lastSurfaceExtensionHeight = Float.NaN
-  private var pendingInitialContentDetentSnap = false
-  private var pendingInitialContentDetentObserver: ViewTreeObserver? = null
-  private var pendingInitialContentDetentPreDrawListener: ViewTreeObserver.OnPreDrawListener? = null
-  private var pendingInitialContentDetentFrames = 0
+      override fun notifyCloseRequestStateChanged() =
+        this@BottomSheetHostView.notifyCloseRequestStateChanged()
 
-  private val contentHeightMarkerLayoutListener =
-    View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> refreshDetentsFromLayout() }
+      override fun performCloseRequest() = this@BottomSheetHostView.performCloseRequest()
+
+      override fun updateInteractionState() = this@BottomSheetHostView.updateInteractionState()
+
+      override fun layoutSheetContainer(viewWidth: Int, viewHeight: Int) =
+        this@BottomSheetHostView.layoutSheetContainer(viewWidth, viewHeight)
+
+      override fun refreshDetentsFromLayout() = detents.refreshDetentsFromLayout()
+    }
+  private val scrim = Scrim(state)
+  private val card = Card(state, clipContainer, scrim)
+  private val cardTouchSensor = BottomSheetCardTouchSensor(context, card::onTouchTargeting)
+
+  private var hasPerformedHostLayoutSinceAttach = false
+  private val closeRequestPresentationTracker = CloseRequestPresentationTracker()
+  private val contentRegion = ContentRegion(state, card, sheetHost)
+  private val snapping =
+    Snapping(state, scrim, card, contentRegion, closeRequestPresentationTracker, sheetHost)
+  private val detents: Detents =
+    Detents(
+      state,
+      clipContainer,
+      scrim,
+      contentRegion,
+      snapping,
+      closeRequestPresentationTracker,
+      sheetHost,
+    )
+  private val scrollCoordination = ScrollCoordination(state, snapping)
+  private val gestures = Gestures(state, card, scrim, snapping, scrollCoordination)
+  private val scrimDismissView =
+    ScrimDismissView(
+      context,
+      performDismiss = ::attemptAccessibleDismissal,
+      traversalAfter = sheetContainer,
+    )
 
   init {
+    scrim.onVisibilityChanged = ::notifyCloseRequestStateChanged
     clipChildren = false
     clipToPadding = false
     // Set directly rather than via the JSX prop because Fabric doesn't forward
@@ -155,30 +200,61 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
       sheetContainer,
       LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
     )
+    // Below the clip container, so the clip never cuts the shadows.
+    for (shadowView in card.shadowViews) {
+      sheetContainer.addView(
+        shadowView,
+        LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
+      )
+    }
+    sheetContainer.addView(
+      clipContainer,
+      LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
+    )
+    // Above the sheet container, so React Native's target walk reaches it first.
+    super.addView(
+      cardTouchSensor,
+      LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
+    )
+    // Last, so the sheet container and the touch sensor keep their places.
+    // It ends at the sheet's top, overlapping only the card's clipped
+    // corners, where the scrim shows through. Touch walks skip it.
+    super.addView(
+      scrimDismissView,
+      LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
+    )
+    ViewCompat.setAccessibilityDelegate(
+      sheetContainer,
+      SheetDismissAccessibilityDelegate(
+        isDismissAvailable = { snapping.isCloseRequestAvailable },
+        performDismiss = ::attemptAccessibleDismissal,
+      ),
+    )
   }
 
   val sheetChildCount: Int
-    get() = sheetContainer.childCount
+    get() = clipContainer.childCount
 
-  fun getSheetChildAt(index: Int): View? = sheetContainer.getChildAt(index)
+  fun getSheetChildAt(index: Int): View? = clipContainer.getChildAt(index)
 
   fun addSheetChild(child: View, index: Int) {
-    sheetContainer.addView(child, index)
-    refreshContentHeightMarker()
+    clipContainer.addView(child, index)
+    detents.refreshContentHeightMarker()
   }
 
   fun removeSheetChildAt(index: Int) {
-    sheetContainer.removeViewAt(index)
-    refreshContentHeightMarker()
+    clipContainer.getChildAt(index)?.let(card::resetContentTransform)
+    clipContainer.removeViewAt(index)
+    detents.refreshContentHeightMarker()
   }
 
   // MARK: - Child view management
 
   override fun addView(child: View, index: Int, params: ViewGroup.LayoutParams) {
-    if (child === sheetContainer) {
+    if (child === sheetContainer || child === cardTouchSensor || child === scrimDismissView) {
       super.addView(child, index, params)
     } else {
-      sheetContainer.addView(child, index, params)
+      clipContainer.addView(child, index, params)
     }
   }
 
@@ -186,14 +262,16 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     if (view === sheetContainer) {
       super.removeView(view)
     } else {
-      sheetContainer.removeView(view)
-      refreshContentHeightMarker()
+      card.resetContentTransform(view)
+      clipContainer.removeView(view)
+      detents.refreshContentHeightMarker()
     }
   }
 
   override fun removeViewAt(index: Int) {
-    sheetContainer.removeViewAt(index)
-    refreshContentHeightMarker()
+    clipContainer.getChildAt(index)?.let(card::resetContentTransform)
+    clipContainer.removeViewAt(index)
+    detents.refreshContentHeightMarker()
   }
 
   // MARK: - Layout
@@ -215,6 +293,11 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
       layoutSheetContainer(width, height)
     }
   }
+  private val ensureHostLayoutAfterAttach = Runnable {
+    if (isAttachedToWindow && !hasPerformedHostLayoutSinceAttach && width > 0 && height > 0) {
+      performHostLayout(width, height)
+    }
+  }
 
   override fun requestLayout() {
     super.requestLayout()
@@ -229,33 +312,44 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
 
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
-    // Native geometry (cap, frame) is derived from the window; recompute on
+    hasPerformedHostLayoutSinceAttach = false
+    notifyCloseRequestStateChanged()
+    // Native geometry (status bar overlap, frame) is derived from the window; recompute on
     // (re)attach — including the inline<->overlay reparent — and ask for a
-    // fresh insets pass.
+    // fresh insets pass. Fabric may assign unchanged bounds before attaching
+    // the view, in which case Android does not owe us another onSizeChanged or
+    // onLayout callback. Schedule the same host layout pass explicitly so
+    // close request eligibility cannot remain invalid after the attach.
     requestApplyInsets()
-    recomputeNativeGeometry()
+    contentRegion.recomputeNativeGeometry()
+    removeCallbacks(ensureHostLayoutAfterAttach)
+    post(ensureHostLayoutAfterAttach)
     // A re-attach gives us a fresh, live ViewTreeObserver; the previous one was
     // dropped on detach. Resume observing if the initial snap is still pending.
-    if (pendingInitialContentDetentSnap) {
-      observePendingInitialContentDetent()
+    if (detents.pendingInitialContentDetentSnap) {
+      detents.observePendingInitialContentDetent()
     }
   }
 
   override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
     super.onSizeChanged(w, h, oldw, oldh)
-    recomputeNativeGeometry()
+    contentRegion.recomputeNativeGeometry()
   }
 
   override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
-    // The cap depends on the top inset, which can change without a resize.
-    recomputeNativeGeometry()
+    // The default top inset can change without a resize.
+    contentRegion.recomputeNativeGeometry()
     return super.onApplyWindowInsets(insets)
   }
 
   override fun onDetachedFromWindow() {
+    removeCallbacks(ensureHostLayoutAfterAttach)
+    hasPerformedHostLayoutSinceAttach = false
+    notifyCloseRequestStateChanged()
     // Release the listener from the soon-to-be-replaced observer and clear our
     // references so a later re-attach registers on the new live observer.
-    removePendingInitialContentDetentObserver()
+    detents.removePendingInitialContentDetentObserver()
+    state.scrollIndicators.releaseAll()
     super.onDetachedFromWindow()
   }
 
@@ -265,1265 +359,370 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context) {
     val h = bottom - top
     if (w <= 0 || h <= 0) return
 
-    // The cap depends on this view's window position (top-inset overlap),
-    // which can change without a resize.
-    recomputeNativeGeometry()
-    refreshContentHeightMarker()
-    refreshDetentsFromLayout()
+    performHostLayout(w, h)
+  }
+
+  private fun performHostLayout(w: Int, h: Int) {
+    // The default top inset depends on this view's window position, which can
+    // change without a resize.
+    contentRegion.recomputeNativeGeometry()
+    detents.refreshContentHeightMarker()
+    detents.refreshDetentsFromLayout()
+    hasPerformedHostLayoutSinceAttach = true
     layoutSheetContainer(w, h)
 
-    if (!hasLaidOut && detentSpecs.isNotEmpty()) {
-      val indexToApply = pendingIndex ?: targetIndex
-      val clampedIndex = indexToApply.coerceIn(0, detentSpecs.size - 1)
+    if (!state.hasLaidOut && state.detentSpecs.isNotEmpty()) {
+      val indexToApply = state.pendingIndex ?: state.targetIndex
+      val clampedIndex = indexToApply.coerceIn(0, state.detentSpecs.size - 1)
 
-      if (animateIn && isInvalidContentDetentTarget(clampedIndex)) {
-        hasLaidOut = true
-        pendingIndex = null
-        targetIndex = clampedIndex
-        pendingInitialContentDetentSnap = true
-        sheetContainer.translationY = sheetContainerHeight(h)
-        emitPosition()
-        observePendingInitialContentDetent()
+      if (animateIn && detents.isInvalidContentDetentTarget(clampedIndex)) {
+        state.hasLaidOut = true
+        state.pendingIndex = null
+        state.targetIndex = clampedIndex
+        detents.pendingInitialContentDetentSnap = true
+        sheetContainer.translationY = h.toFloat()
+        snapping.emitPosition()
+        notifyCloseRequestStateChanged()
+        detents.observePendingInitialContentDetent()
         return
       }
 
-      hasLaidOut = true
-      pendingIndex = null
-      targetIndex = clampedIndex
-      clearPendingInitialContentDetentSnap()
+      state.hasLaidOut = true
+      state.pendingIndex = null
+      state.targetIndex = clampedIndex
+      detents.clearPendingInitialContentDetentSnap()
 
       if (animateIn) {
-        val closedTy = sheetContainerHeight(h)
+        val closedTy = h.toFloat()
         sheetContainer.translationY = closedTy
-        emitPosition()
-        snapToIndex(targetIndex, 0f, emitIndexChange = false, emitSettle = true)
+        snapping.emitPosition()
+        snapping.snapToIndex(state.targetIndex, 0f, emitIndexChange = false, emitSettle = true)
       } else {
-        sheetContainer.translationY = translationY(targetIndex)
-        emitPosition()
+        closeRequestPresentationTracker.onTransitionSettled()
+        sheetContainer.translationY = snapping.translationY(state.targetIndex)
+        snapping.emitPosition()
+        notifyCloseRequestStateChanged()
       }
       return
     }
 
-    if (activeAnimation != null || isPanning) return
-    sheetContainer.translationY = translationY(targetIndex)
-    updateShadowState(sheetContainer.translationY)
-    updateSheetCornerRadius()
+    if (state.activeAnimation != null || state.isPanning) {
+      notifyCloseRequestStateChanged()
+      return
+    }
+    closeRequestPresentationTracker.onTransitionSettled()
+    sheetContainer.translationY = snapping.translationY(state.targetIndex)
+    card.updateCardGeometry()
+    contentRegion.updateShadowState(sheetContainer.translationY)
+    notifyCloseRequestStateChanged()
   }
 
   override fun dispatchDraw(canvas: Canvas) {
-    drawScrim(canvas)
+    scrim.drawScrim(canvas)
     super.dispatchDraw(canvas)
   }
 
-  private fun layoutSheetChildren(containerWidth: Int, containerHeight: Int) {
-    for (i in 0 until sheetContainer.childCount) {
-      val child = sheetContainer.getChildAt(i)
-      if (child === surfaceView) {
-        layoutSurfaceView(child, containerWidth, containerHeight)
-      } else {
-        child.layout(0, 0, child.measuredWidth, child.measuredHeight)
-      }
-    }
-  }
-
-  // The cap value the container geometry and translations are currently
-  // anchored to. The native cap can change after a layout (insets arriving,
-  // rotation), and translations computed against the old value must then be
-  // re-anchored even when the resolved detent specs are unchanged — the
-  // specs store heights, but translationY derives from the cap.
-  private var lastAppliedMaxDetentHeight = Float.NaN
-
-  private fun layoutSurfaceView(surface: View, containerWidth: Int, containerHeight: Int) {
-    val extensionHeight = surfaceExtensionHeight(currentSheetTop())
-    lastSurfaceExtensionHeight = extensionHeight
-    val extensionPx = extensionHeight.toInt()
-    surface.layout(0, -extensionPx, containerWidth, containerHeight + extensionPx)
-  }
-
+  // Stable coordinate base for the sheet container. The container is sized to
+  // the host's height rather than the tallest detent, so it stays a fixed-size
+  // canvas: when content — and thus the `content` detent — shrinks, the container
+  // does not collapse underneath the sheet, leaving room to animate the sheet
+  // down to its new height.
   private fun layoutSheetContainer(viewWidth: Int, viewHeight: Int) {
-    val containerHeight = sheetContainerHeight(viewHeight)
-    lastAppliedMaxDetentHeight = containerHeight
-    sheetContainer.layout(0, 0, viewWidth, containerHeight.toInt())
-    layoutSheetChildren(viewWidth, containerHeight.toInt())
+    state.lastAppliedMaxDetentHeight = viewHeight.toFloat()
+    sheetContainer.layout(0, 0, viewWidth, viewHeight)
+    cardTouchSensor.layout(0, 0, viewWidth, viewHeight)
+    scrimDismissView.layout(0, 0, viewWidth, viewHeight)
+    updateScrimDismissView()
+    card.layoutSheetChildren(viewWidth, viewHeight)
+    card.updateCardGeometry()
+    contentRegion.pushStateSnapshot()
   }
 
   // MARK: - Prop setters
 
-  fun setDetents(raw: List<Map<String, Any>>) {
-    rawDetentSpecs =
-      raw.mapNotNull { dict ->
-        val value = (dict["value"] as? Number)?.toDouble() ?: return@mapNotNull null
-        val kind =
-          when ((dict["kind"] as? String)?.lowercase()) {
-            "content" -> DetentKind.CONTENT
-            "fullscreen" -> DetentKind.FULLSCREEN
-            else -> DetentKind.POINTS
-          }
-        val programmatic = dict["programmatic"] as? Boolean ?: false
-        RawDetentSpec(value = (value * density).toFloat(), kind = kind, programmatic = programmatic)
-      }
-    refreshDetentsFromLayout()
+  fun setDetents(raw: List<Map<String, Any>>) = detents.setDetents(raw)
+
+  fun setIndex(newIndex: Int) = detents.setIndex(newIndex)
+
+  fun setScrimColor(color: Int?) = scrim.setScrimColor(color)
+
+  /** The label accessibility services announce for the scrim's "Dismiss" button. */
+  fun setScrimAccessibilityLabel(label: String?) {
+    scrimDismissView.contentDescription = label
   }
 
-  fun setDetentCornerRadius(values: List<Float>?) {
-    detentCornerRadii = values?.map { it.coerceAtLeast(0f) * density } ?: emptyList()
-    updateSheetCornerRadius()
-  }
+  // MARK: - Close requests
 
-  fun setIndex(newIndex: Int) {
-    if (newIndex < 0) return
+  private val isCloseRequestLayoutReady: Boolean
+    get() =
+      hasPerformedHostLayoutSinceAttach &&
+        isAttachedToWindow &&
+        width > 0 &&
+        height > 0 &&
+        !detents.isInvalidContentDetentTarget(state.targetIndex)
 
-    if (!hasLaidOut) {
-      pendingIndex = newIndex
-      targetIndex = newIndex
-      return
-    }
+  private val isTargetDetentOpen: Boolean
+    get() = state.detentSpecs.getOrNull(state.targetIndex)?.position?.let { it > 0f } == true
 
-    if (pendingInitialContentDetentSnap) {
-      // The initial open is still deferred because the target content detent is
-      // not measurable yet. Retarget the deferred snap so the requested index is
-      // reflected, then either complete it now (e.g. a points detent that is
-      // already resolvable) or keep waiting for the content to measure.
-      targetIndex = newIndex.coerceIn(0, detentSpecs.size - 1)
-      if (!trySnapPendingInitialContentDetent()) {
-        observePendingInitialContentDetent()
-      }
-      return
-    }
+  // Request emission follows the resolved target rather than the transient animated position.
+  val isCloseRequestTargetResolvedAndOpen: Boolean
+    get() = isCloseRequestLayoutReady && isTargetDetentOpen
 
-    if (newIndex >= detentSpecs.size || newIndex == targetIndex) return
-    snapToIndex(newIndex, 0f, emitIndexChange = false)
-  }
+  /** Keeps the modal input boundary through a visible animated close. */
+  val isCloseRequestPresentationActive: Boolean
+    get() =
+      closeRequestPresentationTracker.isPresentationActive(
+        isTargetDetentOpen = isTargetDetentOpen,
+        isCloseRequestLayoutReady = isCloseRequestLayoutReady,
+      )
 
-  fun setScrimColor(color: Int?) {
-    scrimColor = color ?: Color.TRANSPARENT
-    invalidate()
-  }
-
-  fun setScrimOpacities(values: List<Float>) {
-    scrimOpacities = if (values.isEmpty()) listOf(1f) else values
-    updateScrim()
-  }
-
-  fun setSafeAreaTopInset(safeAreaTopInset: Double) {
-    this.safeAreaTopInset = (safeAreaTopInset * density).toFloat().coerceAtLeast(0f)
-    updateSurfaceExtension()
-  }
-
-  fun setFullscreenTopOffset(fullscreenTopOffset: Double) {
-    val resolvedOffset = (fullscreenTopOffset * density).toFloat().coerceAtLeast(0f)
-    if (this.fullscreenTopOffset == resolvedOffset) return
-    this.fullscreenTopOffset = resolvedOffset
-    // The offset changes fullscreen detents and the content-region inset, so
-    // refresh both the native geometry state and the resolved detents.
-    recomputeNativeGeometry()
-    refreshDetentsFromLayout()
-    updateSurfaceExtension()
-  }
-
-  // Stable coordinate base for the sheet container. The container is sized to
-  // the full available height rather than the tallest detent, so it stays a
-  // fixed-size canvas: when content — and thus the `content` detent — shrinks,
-  // the container does not collapse underneath the sheet, leaving room to
-  // animate the sheet down to its new height. The surface fills this canvas, so
-  // the area below the shrunken content stays covered throughout.
-  private fun resolvedMaxDetentHeight(viewHeight: Int = height): Float {
-    val viewHeightPx = viewHeight.toFloat()
-    // The cap is computed natively from this view's measured window geometry
-    // (see recomputeNativeGeometry); before the first measure the full height
-    // applies.
-    if (!nativeCapPx.isFinite() || nativeCapPx <= 0f) {
-      return viewHeightPx
-    }
-    return nativeCapPx.coerceIn(0f, viewHeightPx)
-  }
-
-  private fun sheetContainerHeight(viewHeight: Int = height): Float = viewHeight.toFloat()
-
-  private fun resolveDetentSpecs(): List<DetentSpec> {
-    val maxHeight = resolvedMaxDetentHeight()
-    val measuredContentHeight =
-      validContentHeight().takeIf { maxHeight > 0f && it.isFinite() }?.coerceAtMost(maxHeight)
-    var previousHeight: Float? = null
-    return rawDetentSpecs.mapIndexed { index, spec ->
-      val height =
-        when (spec.kind) {
-          DetentKind.POINTS -> spec.value
-          DetentKind.CONTENT ->
-            measuredContentHeight ?: unresolvedContentDetentHeight(index, maxHeight)
-          DetentKind.FULLSCREEN -> sheetContainerHeight() - fullscreenTopOffset.coerceAtLeast(0f)
-        }
-      val clampedHeight =
-        if (spec.kind == DetentKind.FULLSCREEN) {
-          height.coerceIn(0f, sheetContainerHeight())
-        } else {
-          height.coerceIn(0f, maxHeight)
-        }
-      previousHeight?.let {
-        if (clampedHeight < it) {
-          throw IllegalArgumentException(
-            "Invalid bottom sheet detent at index $index: resolved height ${clampedHeight / density} is lower than previous detent height ${it / density}. Detents must be passed in ascending order."
-          )
-        }
-      }
-      previousHeight = clampedHeight
-      DetentSpec(height = clampedHeight, programmatic = spec.programmatic)
-    }
-  }
-
-  private fun unresolvedContentDetentHeight(index: Int, maxHeight: Float): Float {
-    val nextHeight =
-      rawDetentSpecs.drop(index + 1).firstOrNull()?.let {
-        when (it.kind) {
-          DetentKind.POINTS -> it.value
-          DetentKind.CONTENT -> maxHeight
-          DetentKind.FULLSCREEN -> sheetContainerHeight() - fullscreenTopOffset.coerceAtLeast(0f)
-        }
-      }
-    return (nextHeight ?: maxHeight).coerceIn(0f, maxHeight)
-  }
-
-  private fun refreshDetentsFromLayout() {
-    if (!isPanning) {
-      activeDragRange = null
-      activeDragDetentSpecs = null
-    }
-    if (hasLaidOut && isInvalidContentDetentTarget(targetIndex)) {
-      updateScrim()
-      return
-    }
-
-    val resolvedDetents = resolveDetentSpecs()
-    if (resolvedDetents == detentSpecs && sheetContainerHeight() == lastAppliedMaxDetentHeight) {
-      if (trySnapPendingInitialContentDetent()) {
-        return
-      }
-      updateScrim()
-      updateSheetCornerRadius()
-      return
-    }
-
-    // The re-anchor math below preserves the on-screen sheet height across the
-    // geometry change, so it must relate the current translation to the cap it
-    // was computed against — not the freshly resolved one.
-    val previousMaxHeight =
-      if (lastAppliedMaxDetentHeight.isFinite()) lastAppliedMaxDetentHeight
-      else sheetContainerHeight()
-    // Whether the scrim is currently fully opaque, i.e. the sheet is settled at
-    // or above the first non-zero detent. If so, a detent resize must not dip
-    // the scrim while the sheet re-anchors to the new geometry.
-    val wasScrimFull =
-      modal &&
-        firstNonZeroDetentHeight > 0f &&
-        currentSheetHeight() + 0.5f >= firstNonZeroDetentHeight
-    detentSpecs = resolvedDetents
-    if (width > 0 && height > 0 && detentSpecs.isNotEmpty()) {
-      layoutSheetContainer(width, height)
-
-      if (hasLaidOut && !isPanning) {
-        targetIndex = targetIndex.coerceIn(0, detentSpecs.size - 1)
-        val newMaxHeight = sheetContainerHeight()
-        val targetTy = translationY(targetIndex)
-        if (trySnapPendingInitialContentDetent()) {
-          return
-        }
-        if (activeAnimation != null && isTargetingClosedDetent) {
-          suppressScrimForClosingTarget = true
-          hideScrim()
-        }
-        if (activeAnimation != null) {
-          val currentTy = sheetContainer.translationY
-          val shouldEmitSettle = activeAnimationEmitsSettle
-          activeAnimation?.cancel()
-          activeAnimation = null
-          activeAnimationEmitsSettle = false
-          // Re-anchor the in-flight position to the new container height so the
-          // sheet surface keeps the same on-screen height across the resize.
-          val visibleHeight = previousMaxHeight - currentTy
-          sheetContainer.translationY = (newMaxHeight - visibleHeight).coerceIn(0f, newMaxHeight)
-          scrimPinnedFull = scrimPinnedFull || wasScrimFull
-          emitPosition()
-          snapToIndex(
-            targetIndex,
-            0f,
-            emitIndexChange = false,
-            emitSettle = shouldEmitSettle,
-            preserveScrimPin = true,
-          )
-        } else {
-          val currentVisibleHeight = previousMaxHeight - sheetContainer.translationY
-          val targetHeight = detentSpecs.getOrNull(targetIndex)?.height ?: 0f
-          val shouldAnimateHeight = shouldAnimateContentHeight(targetIndex)
-          if (kotlin.math.abs(targetHeight - currentVisibleHeight) <= 0.5f) {
-            // No meaningful change.
-            sheetContainer.translationY = targetTy
-            emitPosition()
-          } else if (!shouldAnimateHeight) {
-            sheetContainer.translationY = targetTy
-            emitPosition()
-          } else {
-            // The content detent changed (grew or shrank): re-anchor at the
-            // current visible height, then animate to the new target. The
-            // surface covers the full sheet, so a shrink no longer exposes
-            // blank space.
-            sheetContainer.translationY =
-              (newMaxHeight - currentVisibleHeight).coerceIn(0f, newMaxHeight)
-            scrimPinnedFull = scrimPinnedFull || wasScrimFull
-            emitPosition()
-            snapToIndex(
-              targetIndex,
-              0f,
-              emitIndexChange = false,
-              emitSettle = true,
-              preserveScrimPin = true,
-            )
-          }
-        }
-      }
-    }
-
-    requestLayout()
-    updateScrim()
-  }
-
-  private fun shouldAnimateContentHeight(index: Int): Boolean =
-    animateContentHeight || rawDetentSpecs.getOrNull(index)?.kind != DetentKind.CONTENT
-
-  private fun currentContentHeight(): Float {
-    val marker = contentHeightMarker ?: return Float.NaN
-    return marker.top.toFloat()
-  }
-
-  private fun validContentHeight(): Float {
-    return currentContentHeight().takeIf { it.isFinite() && it > 0f } ?: Float.NaN
-  }
-
-  private fun isInvalidContentDetentTarget(index: Int): Boolean {
-    return rawDetentSpecs.getOrNull(index)?.kind == DetentKind.CONTENT &&
-      !validContentHeight().isFinite()
-  }
-
-  private fun trySnapPendingInitialContentDetent(): Boolean {
-    if (!pendingInitialContentDetentSnap || isInvalidContentDetentTarget(targetIndex)) {
-      return false
-    }
-
-    pendingInitialContentDetentSnap = false
-    removePendingInitialContentDetentObserver()
-    snapToIndex(targetIndex, 0f, emitIndexChange = false, emitSettle = true)
-    return true
-  }
-
-  private fun clearPendingInitialContentDetentSnap() {
-    pendingInitialContentDetentSnap = false
-    removePendingInitialContentDetentObserver()
-  }
-
-  private fun observePendingInitialContentDetent() {
-    if (pendingInitialContentDetentPreDrawListener != null) return
-
-    val observer = viewTreeObserver
-    if (!observer.isAlive) return
-
-    pendingInitialContentDetentFrames = 0
-    val listener =
-      ViewTreeObserver.OnPreDrawListener {
-        refreshContentHeightMarker()
-        refreshDetentsFromLayout()
-        // refreshDetentsFromLayout() completes and stops observing via
-        // trySnapPendingInitialContentDetent() once the target is measurable.
-        // If it is still pending, this frame was unproductive: bound how many
-        // such frames we spend so a content detent that never becomes
-        // measurable cannot keep us redrawing forever.
-        if (
-          pendingInitialContentDetentSnap &&
-            ++pendingInitialContentDetentFrames >= MAX_PENDING_INITIAL_CONTENT_DETENT_FRAMES
-        ) {
-          removePendingInitialContentDetentObserver()
-        }
-        true
-      }
-
-    // Keep the exact observer instance used for registration. Android can
-    // replace a ViewTreeObserver across attach/detach boundaries, and listeners
-    // must be removed from the same live observer that received them.
-    pendingInitialContentDetentObserver = observer
-    pendingInitialContentDetentPreDrawListener = listener
-    observer.addOnPreDrawListener(listener)
-  }
-
-  private fun removePendingInitialContentDetentObserver() {
-    val observer = pendingInitialContentDetentObserver
-    val listener = pendingInitialContentDetentPreDrawListener
-
-    if (observer?.isAlive == true && listener != null) {
-      observer.removeOnPreDrawListener(listener)
-    }
-
-    pendingInitialContentDetentObserver = null
-    pendingInitialContentDetentPreDrawListener = null
-  }
-
-  private fun refreshContentHeightMarker() {
-    surfaceView = findSurfaceView()
-    val marker = findContentHeightMarker()
-    if (marker === contentHeightMarker) return
-    contentHeightMarker?.removeOnLayoutChangeListener(contentHeightMarkerLayoutListener)
-    contentHeightMarker = marker
-    contentHeightMarker?.addOnLayoutChangeListener(contentHeightMarkerLayoutListener)
-  }
-
-  private fun findSurfaceView(): View? {
-    for (i in 0 until sheetContainer.childCount) {
-      val child = sheetContainer.getChildAt(i)
-      if (child is BottomSheetSurfaceView) return child
-    }
-    return null
-  }
-
-  private fun findContentHeightMarker(): View? {
-    // The surface is a sibling of the content wrapper; skip it so the marker is
-    // always read from the content, never from the surface.
-    val contentView =
-      (0 until sheetContainer.childCount)
-        .map { sheetContainer.getChildAt(it) }
-        .firstOrNull { it !== surfaceView } as? ViewGroup ?: return null
-    if (contentView.childCount == 0) return null
-    return contentView.getChildAt(contentView.childCount - 1)
-  }
-
-  // MARK: - Snap logic
-
-  private fun translationY(index: Int): Float {
-    val maxHeight = sheetContainerHeight()
-    val snapHeight = detentSpecs.getOrNull(index)?.height ?: 0f
-    return maxHeight - snapHeight
-  }
-
-  private val minDetentTranslationY: Float
-    get() = detentSpecs.indices.minOfOrNull(::translationY) ?: 0f
-
-  private val maxDetentTranslationY: Float
-    get() = detentSpecs.indices.maxOfOrNull(::translationY) ?: 0f
-
-  private val closedIndex: Int?
-    get() = detentSpecs.indexOfFirst { it.height == 0f }.takeIf { it >= 0 }
-
-  private val scrimDismissIndex: Int?
-    get() = closedIndex?.takeIf { !detentSpecs[it].programmatic }
-
-  private val firstNonZeroDetentHeight: Float
-    get() = detentSpecs.firstOrNull { it.height > 0f }?.height ?: 0f
-
-  private val isTargetingClosedDetent: Boolean
-    get() = closedIndex?.let { targetIndex == it } == true
-
-  private fun snapCandidateIndices(includeIndex: Int? = null): List<Int> {
-    val indices = detentSpecs.indices.filter { !detentSpecs[it].programmatic }.toMutableList()
-    if (
-      includeIndex != null &&
-        includeIndex in detentSpecs.indices &&
-        detentSpecs[includeIndex].programmatic
-    ) {
-      indices.add(includeIndex)
-    }
-    return indices.distinct().sortedBy { detentSpecs[it].height }
-  }
-
-  private fun draggableRange(includeIndex: Int? = null): ClosedFloatingPointRange<Float> {
-    val candidates = snapCandidateIndices(includeIndex)
-    if (candidates.isEmpty()) return 0f..0f
-    val translations = candidates.map(::translationY)
-    return (translations.minOrNull() ?: 0f)..(translations.maxOrNull() ?: 0f)
-  }
-
-  private fun snapshotTranslationY(index: Int, specs: List<DetentSpec>): Float {
-    val maxHeight = sheetContainerHeight()
-    val snapHeight = specs.getOrNull(index)?.height ?: 0f
-    return maxHeight - snapHeight
-  }
-
-  private fun snapshotCandidateIndices(includeIndex: Int?, specs: List<DetentSpec>): List<Int> {
-    val indices = specs.indices.filter { !specs[it].programmatic }.toMutableList()
-    if (includeIndex != null && includeIndex in specs.indices && specs[includeIndex].programmatic) {
-      indices.add(includeIndex)
-    }
-    return indices.distinct().sortedBy { specs[it].height }
-  }
-
-  private fun snapshotDraggableRange(
-    includeIndex: Int?,
-    specs: List<DetentSpec>,
-  ): ClosedFloatingPointRange<Float> {
-    val candidates = snapshotCandidateIndices(includeIndex, specs)
-    if (candidates.isEmpty()) return 0f..0f
-    val translations = candidates.map { snapshotTranslationY(it, specs) }
-    return (translations.minOrNull() ?: 0f)..(translations.maxOrNull() ?: 0f)
-  }
-
-  private fun isAtMaxDragCandidate(includeIndex: Int? = null): Boolean {
-    val range = draggableRange(includeIndex)
-    return sheetContainer.translationY <= range.start + 1f
-  }
-
-  private fun emitPosition() {
-    val maxHeight = sheetContainerHeight()
-    val ty = sheetContainer.translationY
-    val position = maxHeight - ty
-    updateScrim(position)
-    updateSheetVisibility(position)
-    updateSheetCornerRadius(position)
-    updateSurfaceExtension()
-    updateInteractionState()
-    listener?.onPositionChange((position / density).toDouble(), detentIndexAt(position).toDouble())
-    updateShadowState(ty)
-  }
-
-  // Fractional detent index in 0..(detentSpecs.size - 1): 0 at the shortest
-  // detent, 1 at the next, and so on, interpolated by position in between. The
-  // continuous counterpart of `onIndexChange`, so consumers can drive a backdrop
-  // or animate per detent without knowing the sheet's height.
-  private fun detentIndexAt(position: Float): Float =
-    interpolateAtPosition(position, detentSpecs.indices.map { it.toFloat() })
-
-  private fun updateSheetVisibility(position: Float) {
-    sheetContainer.alpha = if (position <= 0.5f) 0f else 1f
-  }
-
-  /** Resolves and applies the mask from the live native sheet position. */
-  private fun updateSheetCornerRadius(position: Float = currentSheetHeight()) {
-    val radius =
-      if (position <= 0.5f) {
-        0f
-      } else {
-        interpolateAtPosition(
-          position,
-          detentSpecs.indices.map(::detentCornerRadiusAt),
-        ).coerceAtLeast(0f)
-      }
-    sheetContainer.setTopCornerRadius(radius)
-  }
-
-  private fun detentCornerRadiusAt(index: Int): Float {
-    // Fullscreen meets the host edge and therefore has square top corners.
-    if (rawDetentSpecs.getOrNull(index)?.kind == DetentKind.FULLSCREEN) return 0f
-    // BottomSheet.tsx forwards its public default (12) for omitted entries.
-    // An absent native prop means the JS caller intentionally disabled it via
-    // detentDefaultCornerRadius={0}, so do not resurrect a stale radius here.
-    return detentCornerRadii.getOrNull(index) ?: 0f
-  }
-
-  private fun currentSheetTop(): Float = sheetContainer.top + sheetContainer.translationY
-
-  private fun surfaceExtensionHeight(sheetTop: Float): Float {
-    val maxDetentHeight = detentSpecs.maxOfOrNull { it.height } ?: 0f
-    if (maxDetentHeight >= sheetContainerHeight() - 0.5f) {
-      return 0f
-    }
-    val topInset = safeAreaTopInset.coerceAtLeast(0f)
-    val topOffset = fullscreenTopOffset.coerceAtLeast(0f)
-    val travel = topInset - topOffset
-    if (topInset <= 0f || travel <= 0f) return 0f
-    val progress = ((topInset - sheetTop) / travel).coerceIn(0f, 1f)
-    return minOf(sheetTop.coerceAtLeast(0f), topOffset * progress)
-  }
-
-  private fun updateSurfaceExtension() {
-    val surface = surfaceView ?: return
-    if (sheetContainer.width <= 0 || sheetContainer.height <= 0) return
-    val extensionHeight = surfaceExtensionHeight(currentSheetTop())
-    if (abs(extensionHeight - lastSurfaceExtensionHeight) <= 0.5f) return
-    layoutSurfaceView(surface, sheetContainer.width, sheetContainer.height)
-  }
-
-  private var lastShadowOffsetY = Float.NaN
-  private var lastGeometryStateWidth = 0
-  private var lastGeometryStateHeight = 0
-  private var lastGeometryStateInsetTop = Float.NaN
-  // The natively computed detent cap: this view's height minus the part of the
-  // window's top (status bar / display cutout) inset that actually overlaps it.
-  // Measured from real window geometry in every mode — inline, portal, and
-  // overlay — so no JS-estimated dimensions are involved. NaN until the view is
-  // attached and sized, in which case the full height applies.
-  private var nativeCapPx = Float.NaN
-
-  var extendUnderStatusBar: Boolean = false
+  /** Whether JS supplied `onCloseRequest`. */
+  var hasCloseRequestHandler: Boolean
+    get() = state.hasCloseRequestHandler
     set(value) {
-      if (field == value) return
-      field = value
-      recomputeNativeGeometry()
+      if (state.hasCloseRequestHandler == value) return
+      state.hasCloseRequestHandler = value
+      updateScrimDismissView()
+      notifyCloseRequestStateChanged()
     }
 
   /**
-   * Re-derives all natively measured geometry from this view's own size, window position, and the
-   * window's top inset, then pushes it into the shadow tree: the sheet frame (consumed by the
-   * component descriptor only in overlay mode, exactly as <Modal> does) and the content region's
-   * top inset (applied as Yoga top padding in every mode, so in-flow content lays out exactly
-   * within the detent cap). Yoga thus lays the sheet subtree out against real window geometry
-   * instead of JS-provided dimensions (issue #48). In overlay mode this view fills the dialog, so
-   * its own metrics are the dialog's.
+   * Whether Back and Escape belong to the sheet: it has an `onCloseRequest` handler or a closed
+   * detent to snap to, while its scrim shows or it is still visibly closing, so a close keeps Back
+   * and Escape until it settles either way.
    */
-  private fun recomputeNativeGeometry() {
-    if (width <= 0 || height <= 0 || !isAttachedToWindow) return
-
-    val topInset =
-      ViewCompat.getRootWindowInsets(this)
-        ?.getInsets(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout())
-        ?.top ?: 0
-    val location = IntArray(2)
-    getLocationInWindow(location)
-    // Only the part of the inset this view actually extends under matters: a
-    // sheet inside a container that starts below the status bar keeps its full
-    // height.
-    val topOverlap = (topInset - location[1]).coerceAtLeast(0)
-    val cap =
-      (if (extendUnderStatusBar) height else height - topOverlap).toFloat().coerceAtLeast(0f)
-
-    val capChanged = cap != nativeCapPx
-    nativeCapPx = cap
-    pushGeometryState(width, height, height - cap)
-    if (capChanged) {
-      refreshDetentsFromLayout()
-      requestLayout()
+  val handlesCloseRequests: Boolean
+    get() {
+      if (state.hasCloseRequestHandler || snapping.handlesCloseRequests) return true
+      val isVisiblyClosing = isCloseRequestPresentationActive && !isTargetDetentOpen
+      return state.scrimDismissIndex != null && isVisiblyClosing
     }
-  }
-
-  private fun pushGeometryState(widthPx: Int, heightPx: Int, insetTopPx: Float) {
-    val hasFullscreenDetent = rawDetentSpecs.any { it.kind == DetentKind.FULLSCREEN }
-    val contentRegionInsetPx =
-      if (hasFullscreenDetent) {
-        minOf(insetTopPx.coerceAtLeast(0f), fullscreenTopOffset.coerceAtLeast(0f))
-      } else {
-        insetTopPx
-      }
-    if (
-      widthPx == lastGeometryStateWidth &&
-        heightPx == lastGeometryStateHeight &&
-        contentRegionInsetPx == lastGeometryStateInsetTop
-    ) {
-      return
-    }
-    lastGeometryStateWidth = widthPx
-    lastGeometryStateHeight = heightPx
-    lastGeometryStateInsetTop = contentRegionInsetPx
-    pushStateSnapshot()
-  }
 
   /**
-   * Pushes the complete state — geometry and content offset together — in every update. Android's
-   * state-update path builds the new C++ state data from a base captured at call time and replaces
-   * it wholesale at commit time, so partial payloads from independent sources can wipe each other's
-   * keys when updates race within a commit window. Complete snapshots make the replacement harmless
-   * regardless of ordering.
+   * The one path every close request takes: a scrim tap, an accessibility dismiss action, Back and
+   * Escape. With an `onCloseRequest` handler the request is only reported; without one the sheet
+   * snaps to its closed detent, which reports through `onIndexChange`.
    */
-  private fun pushStateSnapshot() {
-    val sw = stateWrapper ?: return
-    val map = Arguments.createMap()
-    map.putDouble(
-      "contentOffsetY",
-      if (lastShadowOffsetY.isNaN()) 0.0 else lastShadowOffsetY.toDouble(),
+  fun performCloseRequest(): Boolean {
+    if (state.hasCloseRequestHandler) {
+      val currentListener = listener ?: return false
+      currentListener.onCloseRequest()
+      return true
+    }
+    return snapping.snapToScrimDismissIndex()
+  }
+
+  private fun notifyCloseRequestStateChanged() {
+    closeRequestStateChangedListener?.invoke()
+  }
+
+  // MARK: - Card geometry
+
+  /** Physical corner radii of the card in dp: top-left, top-right, bottom-right, bottom-left. */
+  fun setSurfaceCornerRadii(values: List<Float>) = card.setSurfaceCornerRadii(values)
+
+  /** Outset card shadows, with lengths in dp. */
+  internal fun setSurfaceShadows(values: List<CardShadow>) = card.setSurfaceShadows(values)
+
+  /** The card's elevation shadow, with its length in dp. */
+  fun setSurfaceElevation(value: Float) = card.setSurfaceElevation(value)
+
+  fun setSurfaceShadowColor(color: Int) = card.setSurfaceShadowColor(color)
+
+  /** Forwarded to [ContentRegion.onStateCommitted]. */
+  fun onStateCommitted(
+    frameWidthDp: Double,
+    frameHeightDp: Double,
+    contentRegionInsetDp: Double,
+    surfaceOverflowDp: Double,
+  ) =
+    contentRegion.onStateCommitted(
+      frameWidthDp,
+      frameHeightDp,
+      contentRegionInsetDp,
+      surfaceOverflowDp,
     )
-    map.putDouble("frameWidth", (lastGeometryStateWidth / density).toDouble())
-    map.putDouble("frameHeight", (lastGeometryStateHeight / density).toDouble())
-    map.putDouble(
-      "contentRegionInset",
-      ((if (lastGeometryStateInsetTop.isNaN()) 0f else lastGeometryStateInsetTop) / density)
-        .toDouble(),
-    )
-    sw.updateState(map)
-  }
-
-  private fun updateShadowState(translationY: Float) {
-    val offsetY = (translationY / density).toDouble()
-    if (offsetY.toFloat() == lastShadowOffsetY) return
-    lastShadowOffsetY = offsetY.toFloat()
-    pushStateSnapshot()
-  }
-
-  // MARK: - Spring animation
-
-  private fun snapToIndex(
-    index: Int,
-    velocity: Float,
-    emitIndexChange: Boolean = true,
-    emitSettle: Boolean = true,
-    preserveScrimPin: Boolean = false,
-  ) {
-    if (index < 0 || index >= detentSpecs.size) return
-    targetIndex = index
-    if (!isTargetingClosedDetent) {
-      suppressScrimForClosingTarget = false
-    }
-    if (!preserveScrimPin) {
-      scrimPinnedFull = false
-    }
-
-    val targetTy = translationY(index)
-    activeAnimationEmitsSettle = emitSettle
-    activeAnimation?.cancel()
-
-    val currentTy = sheetContainer.translationY
-
-    val minAnimationTy = minOf(minDetentTranslationY, currentTy, targetTy)
-    val maxAnimationTy = maxOf(maxDetentTranslationY, currentTy, targetTy)
-    val distance = targetTy - currentTy
-    val velocityRatio = if (distance != 0f) velocity / distance else 0f
-    val initialVelocity = velocityRatio.coerceIn(-5f, 5f) * distance
-
-    val spring =
-      SpringAnimation(sheetContainer, DynamicAnimation.TRANSLATION_Y, targetTy).apply {
-        spring =
-          SpringForce(targetTy).apply {
-            dampingRatio = SpringForce.DAMPING_RATIO_NO_BOUNCY
-            val durationScale = animationDurationMs / 450f
-            stiffness = SpringForce.STIFFNESS_MEDIUM / (durationScale * durationScale)
-          }
-        setMinValue(minAnimationTy)
-        setMaxValue(maxAnimationTy)
-        setStartVelocity(initialVelocity)
-        // Forward the position on every frame of the settle. The listener fires
-        // immediately after the spring writes `translationY`, so `emitPosition`
-        // reads the value being shown this frame — keeping followers that track
-        // `onPositionChange` (e.g. a Reanimated view) in lockstep with the sheet.
-        addUpdateListener { _, _, _ -> emitPosition() }
-        addEndListener { _, canceled, _, _ ->
-          if (canceled) {
-            return@addEndListener
-          }
-          activeAnimation = null
-          activeAnimationEmitsSettle = false
-          suppressScrimForClosingTarget = false
-          scrimPinnedFull = false
-          if (closedIndex == index) {
-            sheetContainer.translationY = translationY(index)
-            hideScrim()
-          }
-          emitPosition()
-          updateInteractionState()
-          if (emitSettle) listener?.onSettle(index)
-        }
-      }
-
-    activeAnimation = spring
-    // Report the index change as soon as the snap is committed, not when it
-    // finishes: targetIndex is already set, and a programmatic snap's start is
-    // known to the caller. onSettle remains the signal for movement end.
-    if (emitIndexChange) listener?.onIndexChange(index)
-    spring.start()
-  }
-
-  private fun bestSnapIndex(currentHeight: Float, velocity: Float, includeIndex: Int? = null): Int {
-    val candidates = snapCandidateIndices(includeIndex)
-    if (candidates.isEmpty()) return targetIndex
-
-    val flickThreshold = 600f * density
-
-    if (velocity < -flickThreshold) {
-      return candidates.firstOrNull { detentSpecs[it].height > currentHeight }
-        ?: candidates.lastOrNull()
-        ?: targetIndex
-    }
-    if (velocity > flickThreshold) {
-      return candidates.lastOrNull { detentSpecs[it].height < currentHeight }
-        ?: candidates.firstOrNull()
-        ?: targetIndex
-    }
-
-    return candidates.minByOrNull { abs(detentSpecs[it].height - currentHeight) } ?: targetIndex
-  }
-
-  private fun snapshotBestSnapIndex(
-    currentHeight: Float,
-    velocity: Float,
-    includeIndex: Int?,
-    specs: List<DetentSpec>,
-  ): Int {
-    val candidates = snapshotCandidateIndices(includeIndex, specs)
-    if (candidates.isEmpty()) return targetIndex
-
-    val flickThreshold = 600f * density
-
-    if (velocity < -flickThreshold) {
-      return candidates.firstOrNull { specs[it].height > currentHeight }
-        ?: candidates.lastOrNull()
-        ?: targetIndex
-    }
-    if (velocity > flickThreshold) {
-      return candidates.lastOrNull { specs[it].height < currentHeight }
-        ?: candidates.firstOrNull()
-        ?: targetIndex
-    }
-
-    return candidates.minByOrNull { abs(specs[it].height - currentHeight) } ?: targetIndex
-  }
 
   // MARK: - Touch handling
 
-  override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
-    val sheetTop = sheetContainer.top + sheetContainer.translationY
-    if (event.actionMasked == MotionEvent.ACTION_DOWN && event.y < sheetTop) {
-      if (isScrimVisible()) {
-        initialTouchX = event.x
-        initialTouchY = event.y
-        lastTouchY = event.y
-        activePointerId = event.getPointerId(0)
-        scrimPressed = true
-        scrimTouchActive = true
-        return true
-      }
-      return false
-    }
+  override fun onInterceptTouchEvent(event: MotionEvent): Boolean =
+    gestures.onInterceptTouchEvent(event)
 
-    when (event.actionMasked) {
-      MotionEvent.ACTION_DOWN -> {
-        initialTouchX = event.x
-        initialTouchY = event.y
-        lastTouchY = event.y
-        activePointerId = event.getPointerId(0)
-      }
-      MotionEvent.ACTION_MOVE -> {
-        if (activePointerId == MotionEvent.INVALID_POINTER_ID) return false
-        val pointerIndex = event.findPointerIndex(activePointerId)
-        if (pointerIndex < 0) return false
-        val x = event.getX(pointerIndex)
-        val y = event.getY(pointerIndex)
-        val dx = x - initialTouchX
-        val dy = y - initialTouchY
+  override fun onTouchEvent(event: MotionEvent): Boolean =
+    gestures.onTouchEvent(event) ?: super.onTouchEvent(event)
 
-        val dragRange = draggableRange(targetIndex)
-        if (abs(dy) > touchSlop && abs(dy) > abs(dx) && dragRange.start < dragRange.endInclusive) {
-          if (disableScrollableNegotiation && findScrollableAtTouch() != null) {
-            return false
-          }
-          if (!isAtMaxDragCandidate(targetIndex)) {
-            lastTouchY = y
-            announceGestureTakeover(event)
-            return true
-          }
-          if (dy > 0 && isScrollViewAtTop()) {
-            lastTouchY = y
-            announceGestureTakeover(event)
-            return true
-          }
-        }
-      }
-      MotionEvent.ACTION_UP,
-      MotionEvent.ACTION_CANCEL -> {
-        initialTouchX = 0f
-        initialTouchY = 0f
-        activePointerId = MotionEvent.INVALID_POINTER_ID
-        scrimPressed = false
-        scrimTouchActive = false
-      }
-    }
-    return false
+  // MARK: - Nested scrolling
+
+  override fun onStartNestedScroll(child: View, target: View, axes: Int, type: Int): Boolean =
+    scrollCoordination.onStartNestedScroll(child, target, axes, type)
+
+  override fun onNestedScrollAccepted(child: View, target: View, axes: Int, type: Int) =
+    scrollCoordination.onNestedScrollAccepted(child, target, axes, type)
+
+  override fun onStopNestedScroll(target: View, type: Int) =
+    scrollCoordination.onStopNestedScroll(target, type)
+
+  override fun onNestedPreScroll(target: View, dx: Int, dy: Int, consumed: IntArray, type: Int) =
+    scrollCoordination.onNestedPreScroll(target, dx, dy, consumed, type)
+
+  override fun onNestedScroll(
+    target: View,
+    dxConsumed: Int,
+    dyConsumed: Int,
+    dxUnconsumed: Int,
+    dyUnconsumed: Int,
+    type: Int,
+    consumed: IntArray,
+  ) =
+    scrollCoordination.onNestedScroll(
+      target,
+      dxConsumed,
+      dyConsumed,
+      dxUnconsumed,
+      dyUnconsumed,
+      type,
+      consumed,
+    )
+
+  override fun onNestedPreFling(target: View, velocityX: Float, velocityY: Float): Boolean =
+    scrollCoordination.onNestedPreFling(target, velocityX, velocityY)
+
+  override fun onNestedFling(
+    target: View,
+    velocityX: Float,
+    velocityY: Float,
+    consumed: Boolean,
+  ): Boolean = scrollCoordination.onNestedFling(target, velocityX, velocityY, consumed)
+
+  override fun getNestedScrollAxes(): Int = scrollCoordination.nestedScrollAxes
+
+  override fun onStartNestedScroll(child: View, target: View, axes: Int): Boolean =
+    onStartNestedScroll(child, target, axes, ViewCompat.TYPE_TOUCH)
+
+  override fun onNestedScrollAccepted(child: View, target: View, axes: Int) {
+    onNestedScrollAccepted(child, target, axes, ViewCompat.TYPE_TOUCH)
   }
 
-  override fun onTouchEvent(event: MotionEvent): Boolean {
-    if (scrimTouchActive) {
-      when (event.actionMasked) {
-        MotionEvent.ACTION_MOVE -> {
-          val sheetTop = sheetContainer.top + sheetContainer.translationY
-          if (event.y >= sheetTop || abs(event.y - initialTouchY) > touchSlop) {
-            scrimPressed = false
-          }
-          return true
-        }
-        MotionEvent.ACTION_UP -> {
-          val closeIndex = scrimDismissIndex
-          val shouldDismiss = scrimPressed && isScrimVisible()
-          scrimPressed = false
-          scrimTouchActive = false
-          activePointerId = MotionEvent.INVALID_POINTER_ID
-          if (shouldDismiss && closeIndex != null) {
-            snapToIndex(closeIndex, 0f)
-          }
-          return true
-        }
-        MotionEvent.ACTION_CANCEL -> {
-          scrimPressed = false
-          scrimTouchActive = false
-          activePointerId = MotionEvent.INVALID_POINTER_ID
-          return true
-        }
-        MotionEvent.ACTION_POINTER_UP -> {
-          return true
-        }
-      }
-    }
-
-    when (event.actionMasked) {
-      MotionEvent.ACTION_MOVE -> {
-        if (!isPanning) beginPan(event)
-        val pointerIndex = event.findPointerIndex(activePointerId)
-        if (pointerIndex < 0) return true
-        val y = event.getY(pointerIndex)
-        velocityTracker?.addMovement(event)
-        val dy = y - lastTouchY
-        lastTouchY = y
-
-        val dragRange = activeDragRange ?: draggableRange(panStartingIndex)
-        val newTy =
-          (sheetContainer.translationY + dy).coerceIn(dragRange.start, dragRange.endInclusive)
-        sheetContainer.translationY = newTy
-        emitPosition()
-        return true
-      }
-      MotionEvent.ACTION_UP,
-      MotionEvent.ACTION_CANCEL -> {
-        endPan()
-        activePointerId = MotionEvent.INVALID_POINTER_ID
-        val velocity =
-          velocityTracker?.let { tracker ->
-            tracker.computeCurrentVelocity(1000)
-            val v = tracker.yVelocity
-            tracker.recycle()
-            v
-          } ?: 0f
-        velocityTracker = null
-        val maxHeight = sheetContainerHeight()
-        val currentHeight = maxHeight - sheetContainer.translationY
-        val startingIndex = panStartingIndex
-        val index =
-          activeDragDetentSpecs
-            ?.takeIf { it.size == detentSpecs.size }
-            ?.let { snapshotBestSnapIndex(currentHeight, velocity, startingIndex, it) }
-            ?: bestSnapIndex(currentHeight, velocity, startingIndex)
-        panStartingIndex = null
-        activeDragRange = null
-        activeDragDetentSpecs = null
-        snapToIndex(index, velocity)
-        return true
-      }
-      MotionEvent.ACTION_POINTER_UP -> {
-        val actionIndex = event.actionIndex
-        if (event.getPointerId(actionIndex) == activePointerId) {
-          val newPointerIndex = if (actionIndex == 0) 1 else 0
-          activePointerId = event.getPointerId(newPointerIndex)
-          lastTouchY = event.getY(newPointerIndex)
-          velocityTracker?.clear()
-        }
-        return true
-      }
-    }
-    return super.onTouchEvent(event)
+  override fun onStopNestedScroll(target: View) {
+    onStopNestedScroll(target, ViewCompat.TYPE_TOUCH)
   }
 
-  private fun beginPan(event: MotionEvent) {
-    if (isPanning) return
-    isPanning = true
-    listener?.onGestureStart()
-    scrimPinnedFull = false
-    panStartingIndex = targetIndex
-    val dragDetentSpecs = detentSpecs.toList()
-    activeDragDetentSpecs = dragDetentSpecs
-    activeDragRange = snapshotDraggableRange(targetIndex, dragDetentSpecs)
-    activePointerId = event.getPointerId(0)
-    lastTouchY = event.y
-    velocityTracker?.recycle()
-    velocityTracker = VelocityTracker.obtain()
-    velocityTracker?.addMovement(event)
-    activeAnimation?.let {
-      it.cancel()
-      activeAnimation = null
-    }
+  override fun onNestedPreScroll(target: View, dx: Int, dy: Int, consumed: IntArray) {
+    onNestedPreScroll(target, dx, dy, consumed, ViewCompat.TYPE_TOUCH)
   }
 
-  private fun endPan() {
-    if (!isPanning) return
-    isPanning = false
-    listener?.onGestureEnd()
+  override fun onNestedScroll(
+    target: View,
+    dxConsumed: Int,
+    dyConsumed: Int,
+    dxUnconsumed: Int,
+    dyUnconsumed: Int,
+  ) {
+    onNestedScroll(
+      target,
+      dxConsumed,
+      dyConsumed,
+      dxUnconsumed,
+      dyUnconsumed,
+      ViewCompat.TYPE_TOUCH,
+    )
   }
 
-  // Announce to ancestors that the sheet is taking over the touch stream. The
-  // press "decider" for any child lives above us, so both signals travel up:
-  //   - onChildStartedNativeGesture cancels React Native's own JS touch
-  //     pipeline (JSTouchDispatcher), covering Pressable/Touchable.
-  //   - requestDisallowInterceptTouchEvent(true) is the standard Android
-  //     handshake honored by ancestor gesture systems such as
-  //     react-native-gesture-handler's orchestrator, which would otherwise
-  //     still recognize a tap on a native button mid-drag. The flag is cleared
-  //     automatically on the next ACTION_DOWN.
-  private fun announceGestureTakeover(event: MotionEvent) {
-    notifyNativeGestureStarted(event)
-    requestDisallowInterceptTouchEvent(true)
-  }
-
-  private fun notifyNativeGestureStarted(event: MotionEvent) {
-    findReactRootView()?.onChildStartedNativeGesture(this, event)
-  }
-
-  private fun findReactRootView(): RootView? {
-    var current: View = this
-    while (true) {
-      if (current is RootView) return current
-      current = current.parent as? View ?: return null
-    }
-  }
-
-  // MARK: - Scroll view helpers
-  //
-  // Explicit scroll-view detection is required because Android's touch dispatch
-  // doesn't support mid-gesture handoff. Once a ScrollView claims a gesture it
-  // keeps it for the entire sequence, and it always claims (returns true from
-  // onTouchEvent) even when at the scroll boundary. Without this check the sheet
-  // could never collapse by dragging down when a ScrollView is at the top.
-
-  private fun isScrollViewAtTop(): Boolean {
-    val scrollView = findScrollableAtTouch() ?: return true
-    val inverted = isViewInverted(scrollView)
-    return if (inverted) !scrollView.canScrollVertically(1) else !scrollView.canScrollVertically(-1)
-  }
-
-  private fun findScrollableAtTouch(): View? {
-    val containerX = initialTouchX - sheetContainer.left - sheetContainer.translationX
-    val containerY = initialTouchY - sheetContainer.top - sheetContainer.translationY
-    if (
-      containerX < 0f ||
-        containerX >= sheetContainer.width ||
-        containerY < 0f ||
-        containerY >= sheetContainer.height
-    ) {
-      return null
-    }
-    return findScrollableAncestor(findTouchTargetAtPoint(sheetContainer, containerX, containerY))
-  }
-
-  private fun findTouchTargetAtPoint(view: View, x: Float, y: Float): View? {
-    if (!view.isShown) return null
-
-    val pointerEvents = (view as? ReactPointerEventsView)?.pointerEvents ?: PointerEvents.AUTO
-    if (pointerEvents == PointerEvents.NONE) return null
-
-    if (view is ViewGroup && pointerEvents != PointerEvents.BOX_ONLY) {
-      for (i in view.childCount - 1 downTo 0) {
-        val child = view.getChildAt(i)
-        val childX = x - child.left - child.translationX
-        val childY = y - child.top - child.translationY
-        if (childX < 0f || childX >= child.width || childY < 0f || childY >= child.height) {
-          continue
-        }
-        findTouchTargetAtPoint(child, childX, childY)?.let {
-          return it
-        }
-      }
-    }
-
-    return if (pointerEvents == PointerEvents.BOX_NONE) null else view
-  }
-
-  private fun findScrollableAncestor(view: View?): View? {
-    var node = view
-
-    while (node != null && node !== sheetContainer) {
-      if (isVerticallyScrollable(node)) {
-        return node
-      }
-
-      node = node.parent as? View
-    }
-
-    return null
-  }
-
-  private fun isVerticallyScrollable(view: View): Boolean {
-    if (!view.canScrollVertically(1) && !view.canScrollVertically(-1)) {
-      return false
-    }
-    return getReactScrollEnabled(view) != false
-  }
-
-  private fun getReactScrollEnabled(view: View): Boolean? {
-    val method =
-      try {
-        view.javaClass.getMethod("getScrollEnabled")
-      } catch (_: NoSuchMethodException) {
-        return null
-      }
-
-    if (
-      method.returnType != Boolean::class.javaPrimitiveType &&
-        method.returnType != Boolean::class.javaObjectType
-    ) {
-      return null
-    }
-
-    return try {
-      method.isAccessible = true
-      method.invoke(view) as? Boolean
-    } catch (_: Exception) {
-      null
-    }
-  }
-
-  private fun isViewInverted(view: View): Boolean {
-    val values = FloatArray(9)
-    var current: View? = view
-    while (current != null && current !== sheetContainer) {
-      if (!current.matrix.isIdentity) {
-        current.matrix.getValues(values)
-        if (values[android.graphics.Matrix.MSCALE_Y] < 0) return true
-      }
-      current = current.parent as? View
-    }
-    return false
+  override fun onNestedScroll(
+    target: View,
+    dxConsumed: Int,
+    dyConsumed: Int,
+    dxUnconsumed: Int,
+    dyUnconsumed: Int,
+    type: Int,
+  ) {
+    onNestedScroll(target, dxConsumed, dyConsumed, dxUnconsumed, dyUnconsumed, type, IntArray(2))
   }
 
   // MARK: - Cleanup
 
   fun destroy() {
-    activeAnimation?.cancel()
-    activeAnimation = null
-    velocityTracker?.recycle()
-    velocityTracker = null
+    snapping.endDragEventIfNeeded()
+    scrollCoordination.clearNestedScrollState()
+    state.activeAnimation?.cancel()
+    state.activeAnimation = null
+    gestures.releaseVelocityTracker()
     removeCallbacks(sheetChildrenLayoutPass)
     sheetChildrenLayoutEnqueued = false
-    nativeCapPx = Float.NaN
-    lastAppliedMaxDetentHeight = Float.NaN
-    lastGeometryStateWidth = 0
-    lastGeometryStateHeight = 0
-    lastGeometryStateInsetTop = Float.NaN
-    clearPendingInitialContentDetentSnap()
-    contentHeightMarker?.removeOnLayoutChangeListener(contentHeightMarkerLayoutListener)
-    contentHeightMarker = null
-    surfaceView = null
-    lastSurfaceExtensionHeight = Float.NaN
-    rawDetentSpecs = emptyList()
-    detentSpecs = emptyList()
-    detentCornerRadii = emptyList()
-    targetIndex = 0
-    pendingIndex = null
-    hasLaidOut = false
-    isPanning = false
-    panStartingIndex = null
-    activeDragRange = null
-    activeDragDetentSpecs = null
-    initialTouchY = 0f
-    initialTouchX = 0f
-    lastTouchY = 0f
-    activePointerId = MotionEvent.INVALID_POINTER_ID
-    scrimPressed = false
-    scrimTouchActive = false
-    scrimProgress = 0f
-    suppressScrimForClosingTarget = false
-    sheetContainer.removeAllViews()
+    removeCallbacks(ensureHostLayoutAfterAttach)
+    state.statusBarOverlapPx = 0f
+    state.lastAppliedMaxDetentHeight = Float.NaN
+    contentRegion.clearGeometryState()
+    detents.clearPendingInitialContentDetentSnap()
+    detents.releaseContentHeightMarker()
+    state.rawDetentSpecs = emptyList()
+    state.hasCardGaps = false
+    clipContainer.setClipsToCard(false)
+    state.widestCardInsets = DetentInsets()
+    scrim.scrimOpacities = emptyList()
+    state.detentSpecs = emptyList()
+    state.targetIndex = 0
+    state.hasCloseRequestHandler = false
+    hasPerformedHostLayoutSinceAttach = false
+    closeRequestPresentationTracker.onHostDestroyed()
+    notifyCloseRequestStateChanged()
+    state.pendingIndex = null
+    state.hasLaidOut = false
+    state.isPanning = false
+    state.panStartingIndex = null
+    state.activeDragRange = null
+    state.activeDragDetentSpecs = null
+    gestures.clearTouchState()
+    scrim.clearScrimProgress()
+    state.suppressScrimForClosingTarget = false
+    state.scrimPinnedFull = false
+    for (i in 0 until clipContainer.childCount) {
+      card.resetContentTransform(clipContainer.getChildAt(i))
+    }
+    clipContainer.removeAllViews()
     stateWrapper = null
-    lastShadowOffsetY = Float.NaN
+    contentRegion.clearShadowOffset()
+    card.clearShadowContentTransform()
+    closeRequestStateChangedListener = null
+    listener = null
   }
 
-  private fun updateScrim(position: Float = currentSheetHeight()) {
-    if (!modal) {
-      scrimProgress = 0f
-      invalidate()
-      return
-    }
+  internal val isInteractive: Boolean
+    // Follow the sheet, not the scrim: scrim opacity is styling, so a modal sheet configured with
+    // a transparent scrim is still presented and must keep receiving touches.
+    get() =
+      modal &&
+        (state.activeAnimation != null ||
+          state.isPanning ||
+          (!state.isTargetingClosedDetent && state.currentSheetHeight() > 0.5f))
 
-    // When settled at the closed detent, dynamic content updates can briefly
-    // produce stale non-zero positions. Keep scrim hidden in this state.
-    if (
-      (isTargetingClosedDetent && activeAnimation == null && !isPanning) ||
-        (suppressScrimForClosingTarget && isTargetingClosedDetent)
-    ) {
-      hideScrim()
-      return
-    }
-
-    // While the sheet is fully open and only its content/detent geometry is
-    // resizing, the position momentarily lags the grown detent height. Keep the
-    // scrim pinned to the fully-open opacity instead of dipping it until the
-    // re-anchor settles.
-    if (scrimPinnedFull) {
-      scrimProgress = fullyOpenScrimOpacity()
-      invalidate()
-      return
-    }
-
-    scrimProgress = scrimOpacityAt(position)
-    invalidate()
-  }
-
-  /** The opacity at the tallest detent, held while the sheet re-anchors. */
-  private fun fullyOpenScrimOpacity(): Float {
-    val maxHeight = detentSpecs.maxOfOrNull { it.height } ?: return 1f
-    return scrimOpacityAt(maxHeight)
+  private fun updateInteractionState() {
+    val interactive = isInteractive
+    pointerEvents = if (interactive) PointerEvents.AUTO else PointerEvents.BOX_NONE
+    interactionListener?.invoke(interactive)
+    updateScrimDismissView()
   }
 
   /**
-   * Interpolates the scrim opacity for a sheet height by bracketing it between adjacent detent
-   * heights and lerping each detent index's configured value.
+   * Requests a close through the scrim-tap path, and withdraws the Dismiss button at once rather
+   * than on the close's first frame, so accessibility focus doesn't linger on a button that no
+   * longer acts.
    */
-  private fun scrimOpacityAt(position: Float): Float =
-    interpolateAtPosition(
-      position,
-      detentSpecs.indices.map {
-        scrimOpacities[it.coerceAtMost(scrimOpacities.size - 1)].coerceIn(0f, 1f)
-      },
+  private fun attemptAccessibleDismissal(): Boolean =
+    snapping.requestClose().also { if (it) updateScrimDismissView() }
+
+  private fun updateScrimDismissView() {
+    scrimDismissView.update(
+      isDismissAvailable = snapping.isCloseRequestAvailable,
+      sheetTop = sheetContainer.top + sheetContainer.translationY,
+      hostHeight = height,
     )
-
-  // Interpolates a per-detent value (one per detent, by index) by the sheet
-  // position, using each detent's resolved height as the breakpoint.
-  private fun interpolateAtPosition(position: Float, values: List<Float>): Float {
-    if (detentSpecs.isEmpty()) return 0f
-    val pairs =
-      detentSpecs.indices.map { detentSpecs[it].height to values[it] }.sortedBy { it.first }
-
-    val first = pairs.first()
-    val last = pairs.last()
-    if (position <= first.first) return first.second
-    if (position >= last.first) return last.second
-
-    for (i in 1 until pairs.size) {
-      val upper = pairs[i]
-      if (position <= upper.first) {
-        val lower = pairs[i - 1]
-        val span = upper.first - lower.first
-        val t = if (span <= 0f) 1f else (position - lower.first) / span
-        return lower.second + (upper.second - lower.second) * t
-      }
-    }
-    return last.second
-  }
-
-  private fun hideScrim() {
-    scrimProgress = 0f
-    invalidate()
-  }
-
-  private fun updateInteractionState() {
-    val interactive = modal && (activeAnimation != null || isPanning || isScrimVisible())
-    pointerEvents = if (interactive) PointerEvents.AUTO else PointerEvents.BOX_NONE
-    interactionListener?.invoke(interactive)
-  }
-
-  private fun currentSheetHeight(): Float {
-    val maxHeight = sheetContainerHeight()
-    return maxHeight - sheetContainer.translationY
-  }
-
-  private fun isScrimVisible(): Boolean = modal && scrimProgress > 0.001f
-
-  private fun drawScrim(canvas: Canvas) {
-    if (!modal || scrimProgress <= 0.001f) {
-      return
-    }
-
-    val alpha = (Color.alpha(scrimColor) * scrimProgress).toInt().coerceIn(0, 255)
-    scrimPaint.color =
-      Color.argb(alpha, Color.red(scrimColor), Color.green(scrimColor), Color.blue(scrimColor))
-    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), scrimPaint)
   }
 
   companion object {
-    // Upper bound on pre-draw passes spent waiting for the initial content
-    // detent to become measurable. This is a safety valve, not the completion
-    // mechanism: the snap is driven by the marker layout listener and the
-    // pre-draw observer, which normally resolve within a few frames. Because a
-    // pending-but-unmeasurable content detent keeps re-invalidating via
-    // updateScrim(), an unbounded observer would redraw every frame forever if
-    // the content never produces a measurable height. The budget is generous
-    // (covers pathologically slow content) but finite; once exhausted we stop
-    // observing to end the redraw loop, while the marker layout listener can
-    // still complete the snap if the content becomes measurable later.
-    private const val MAX_PENDING_INITIAL_CONTENT_DETENT_FRAMES = 240
+    // The `nativeID` the JS side gives the zero-height marker it appends to
+    // the content wrapper. Mirrored in `bottomSheetUtils.ts` and
+    // `BottomSheetHostingView.swift`; keep the three in sync.
+    const val CONTENT_HEIGHT_MARKER_NATIVE_ID = "swm-bottom-sheet-content-height-marker"
   }
 }

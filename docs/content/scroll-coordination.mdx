@@ -1,0 +1,99 @@
+---
+title: Scroll coordination
+---
+
+import { CoordinationModesExample } from '@site/src/examples/scroll-coordination';
+
+# Scroll coordination
+
+`scrollCoordination` controls how vertical gestures that start inside a nested
+scrollable, such as a `ScrollView` or `FlatList`, interact with the sheet.
+Expansion and collapse can be configured independently:
+
+```tsx
+<BottomSheet
+  scrollCoordination={{
+    expand: 'handoff',
+    collapse: 'initial',
+  }}
+>
+  {/* ... */}
+</BottomSheet>
+```
+
+The default is `{ expand: 'handoff', collapse: 'initial' }`. This lets an upward
+drag expand the sheet and continue into the list without lifting, while a
+downward drag chooses either the list or the sheet when the gesture begins. It
+avoids handing a downward list gesture to the sheet midway through the drag,
+which can otherwise cause an accidental collapse.
+
+## Modes
+
+Each direction accepts one of three modes:
+
+| Mode      | Behavior for a gesture that starts in a scrollable                                                                   |
+| --------- | -------------------------------------------------------------------------------------------------------------------- |
+| `none`    | The scrollable keeps the gesture; the sheet does not move.                                                           |
+| `initial` | The sheet or scrollable is selected when the gesture begins, and that owner is kept until the finger lifts.          |
+| `handoff` | Uses the same initial selection but can transfer between the sheet and scrollable at their boundary without lifting. |
+
+<CoordinationModesExample />
+
+For example, with expansion set to `handoff`, dragging up first moves the sheet
+to its largest detent and then scrolls the content. With collapse set to
+`handoff`, dragging down first scrolls the content to its visual start and then
+moves the sheet to a smaller detent. Releasing before the sheet reaches the
+boundary does not fling the content.
+
+Pass a string to use the same mode in both directions:
+
+```tsx
+<BottomSheet scrollCoordination="none">{/* ... */}</BottomSheet>
+```
+
+Or pass an object to configure the directions separately:
+
+```tsx
+<BottomSheet scrollCoordination={{ expand: 'initial', collapse: 'handoff' }}>
+  {/* ... */}
+</BottomSheet>
+```
+
+Gestures that start outside a scrollable are unaffected and continue to move the
+sheet normally.
+
+On iOS and Android, a drag that starts diagonally inside a vertical scrollable
+is resolved like a vertical one: the sheet takes any start the scrollable would
+have accepted as a scroll, so a shallow angle cannot scroll content the sheet
+would otherwise move, although on iOS the content may move briefly before the
+sheet takes the drag. A horizontal scrollable under the touch keeps sideways
+gestures as before. On every platform, a vertical start in a direction the sheet
+cannot move, such as downward at its lowest draggable detent, stays with the
+scrollable. On iOS, if the drag reverses into a `handoff` direction, the sheet
+can take over without lifting once any bounce or refresh pull has scrolled back;
+an `initial` direction keeps the original owner.
+
+## Platform support
+
+Nested and inverted vertical lists are resolved at their visual edge, while
+horizontal lists keep their horizontal gesture handling. Native bounce and
+refresh controls take over after the sheet reaches the boundary in their
+direction.
+
+On iOS, handoff works with `UIScrollView` subclasses. On Android, handoff
+requires an Android nested-scrolling child. React Native’s vertical
+`ScrollView`, `FlatList`, and `SectionList` use a native Android `ScrollView`.
+For the active touch gesture, the sheet temporarily turns on that view’s
+nested-scrolling participation if needed, then restores its previous setting.
+This does not change `scrollEnabled`. Third-party components work when they
+implement the Android nested-scrolling-child contract and have nested scrolling
+enabled. Components such as `WebView` and bespoke scrollers that do not
+participate in nested scrolling use `initial` behavior as a fallback and cannot
+switch consumers in the middle of a gesture.
+
+On the web, handoff works with any ancestor element of the touch that has
+`overflow-y: auto` or `scroll` and actually overflows. Inverted lists are
+recognized by a negative vertical scale, as React Native Web renders them. Mouse
+drags that hand off to content scroll it directly, since browsers don't
+drag-scroll with a mouse. A start that is at least as horizontal as it is
+vertical is always left to the browser, inside or outside a scrollable.

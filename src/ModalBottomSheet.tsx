@@ -1,23 +1,55 @@
 import { createElement } from 'react';
+import type { ColorValue } from 'react-native';
 
 import {
   BottomSheet,
   type BottomSheetInternalProps,
   type BottomSheetProps,
 } from './BottomSheet';
+import type { ModalDetent } from './bottomSheetUtils';
 
-/** Props for the modal bottom-sheet variant rendered through the provider portal. */
-export interface ModalBottomSheetProps extends BottomSheetProps {
+/** Props for the modal bottom-sheet variant, presented through a portal by default. */
+export interface ModalBottomSheetProps extends Omit<
+  BottomSheetProps,
+  'detents'
+> {
   /**
-   * Present the sheet in a native overlay above everything—including native
+   * Snap points for the sheet, as on `BottomSheet`. A detent object can also
+   * set `scrimOpacity`, in 0–1, which scales the scrim color’s alpha at that
+   * detent and is interpolated linearly between detents. It defaults to 0 at a
+   * closed detent and 1 at an open one, so the scrim is transparent when closed
+   * and fully opaque at every open detent.
+   *
+   * @default [0, 'content']
+   */
+  detents?: ModalDetent[];
+  /**
+   * Called when the user asks an open sheet to close without dragging it: a
+   * scrim tap, a screen reader's dismiss action, Android system Back or a
+   * committed predictive Back gesture, or a complete, unmodified physical
+   * Escape press on Android and the web. This is a controlled request: the
+   * sheet does not change its `index` or choose a transition. The consumer
+   * decides whether and how to close it. While a visible sheet is animating to
+   * a closed target, further requests are consumed without another callback
+   * until settle.
+   *
+   * Without a handler, a close request snaps the sheet to its closed detent
+   * and reports it through `onIndexChange`, provided the scrim is visible and
+   * that detent is not `programmatic`. Dragging the sheet closed always reports
+   * through `onIndexChange`.
+   */
+  onCloseRequest?: () => void;
+  /**
+   * Present the sheet in a window overlay above everything—including native
    * modal screens (e.g. a React Navigation native-stack `presentation: "modal"`)
    * —instead of the `BottomSheetProvider` portal.
    *
    * The portal renders into the provider's React tree, so a sheet opened from
    * within a native modal screen is trapped inside that screen and cannot cover
-   * the full window. With `nativeOverlay`, the sheet is reparented natively into
+   * the full window. With `windowOverlay`, the sheet is reparented natively into
    * a window-level overlay (a `UIWindow`-attached container on iOS, a
-   * full-screen transparent dialog on Android) that floats above the modal.
+   * full-screen transparent dialog on Android, a fixed-position layer in
+   * `document.body` on the web) that floats above the modal.
    *
    * No `BottomSheetProvider` is required in this mode. The sheet sizes relative
    * to the window, so it can be colocated with the trigger even when that trigger
@@ -25,23 +57,21 @@ export interface ModalBottomSheetProps extends BottomSheetProps {
    *
    * @default false
    */
-  nativeOverlay?: boolean;
-  /** Scrim color shown behind the modal sheet. */
-  scrimColor?: string;
+  windowOverlay?: boolean;
   /**
-   * Scrim opacities per detent, indexed to match `detents`. Each value in 0-1
-   * scales the scrim color's alpha at the detent of the same index, and the
-   * opacity is linearly interpolated as the sheet is dragged between detents.
-   * A shorter array than `detents` reuses its last value for any remaining
-   * detents.
+   * Scrim color shown behind the modal sheet.
    *
-   * The default maps each detent to 0 when it is closed and 1 otherwise,
-   * so the scrim is transparent at any closed detent and fully opaque at every
-   * open one; e.g., `[0, 'content']` defaults to `[0, 1]`, and all-open detents
-   * default to a constant opaque scrim. Pass one value per detent, e.g.
-   * `[0, 0.5, 1]`, to keep the scrim deepening across every detent.
+   * @default 'transparent'
    */
-  scrimOpacities?: number[];
+  scrimColor?: ColorValue;
+  /**
+   * The label screen readers announce for the scrim while tapping it would
+   * ask the sheet to close, when the scrim is exposed as a dismiss button. Pass a
+   * translated string to localize it.
+   *
+   * @default 'Dismiss'
+   */
+  scrimAccessibilityLabel?: string;
 }
 
 /** Bottom sheet presented above the current UI with a scrim. */

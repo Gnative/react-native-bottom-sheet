@@ -1,8 +1,12 @@
 package com.swmansion.reactnativebottomsheet
 
+import android.graphics.Color
 import android.view.View
 import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.ColorPropConverter
 import com.facebook.react.bridge.ReadableArray
+import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.bridge.ReadableType
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.ReactStylesDiffMap
@@ -11,7 +15,6 @@ import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.uimanager.ViewGroupManager
 import com.facebook.react.uimanager.ViewManagerDelegate
-import com.facebook.react.uimanager.annotations.ReactProp
 import com.facebook.react.uimanager.events.Event
 import com.facebook.react.viewmanagers.BottomSheetViewManagerDelegate
 import com.facebook.react.viewmanagers.BottomSheetViewManagerInterface
@@ -39,17 +42,17 @@ class BottomSheetViewManager :
           dispatchEvent(view, "topIndexChange", event)
         }
 
+        override fun onDragStart() {
+          dispatchEvent(view, "topDragStart", Arguments.createMap())
+        }
+
+        override fun onDragEnd() {
+          dispatchEvent(view, "topDragEnd", Arguments.createMap())
+        }
+
         override fun onSettle(index: Int) {
           val event = Arguments.createMap().apply { putInt("index", index) }
           dispatchEvent(view, "topSettle", event)
-        }
-
-        override fun onGestureStart() {
-          dispatchEvent(view, "topGestureStart", Arguments.createMap())
-        }
-
-        override fun onGestureEnd() {
-          dispatchEvent(view, "topGestureEnd", Arguments.createMap())
         }
 
         override fun onPositionChange(position: Double, index: Double) {
@@ -59,6 +62,10 @@ class BottomSheetViewManager :
               putDouble("index", index)
             }
           dispatchEvent(view, "topPositionChange", event)
+        }
+
+        override fun onCloseRequest() {
+          dispatchEvent(view, "topCloseRequest", Arguments.createMap())
         }
       }
     return view
@@ -101,106 +108,159 @@ class BottomSheetViewManager :
     return mapOf(
       "topIndexChange" to mapOf("registrationName" to "onIndexChange"),
       "topSettle" to mapOf("registrationName" to "onSettle"),
-      "topGestureStart" to mapOf("registrationName" to "onGestureStart"),
-      "topGestureEnd" to mapOf("registrationName" to "onGestureEnd"),
+      "topDragStart" to mapOf("registrationName" to "onDragStart"),
+      "topDragEnd" to mapOf("registrationName" to "onDragEnd"),
       "topPositionChange" to mapOf("registrationName" to "onPositionChange"),
+      "topCloseRequest" to mapOf("registrationName" to "onCloseRequest"),
     )
   }
 
-  @ReactProp(name = "detents")
   override fun setDetents(view: BottomSheetView, detents: ReadableArray?) {
     if (detents == null) return
     val list = mutableListOf<Map<String, Any>>()
     for (i in 0 until detents.size()) {
       val map = detents.getMap(i) ?: continue
+      val inset = { key: String -> if (map.hasKey(key)) map.getDouble(key) else 0.0 }
       list.add(
         mapOf<String, Any>(
           "value" to map.getDouble("value"),
           "kind" to (map.getString("kind") ?: "points"),
           "programmatic" to map.getBoolean("programmatic"),
-        )
+          "usesStatusBarTopInset" to
+            (map.hasKey("usesStatusBarTopInset") && map.getBoolean("usesStatusBarTopInset")),
+          "insetTop" to inset("insetTop"),
+          "insetLeft" to inset("insetLeft"),
+          "insetRight" to inset("insetRight"),
+          "insetBottom" to inset("insetBottom"),
+          "borderRadius" to (if (map.hasKey("borderRadius")) map.getDouble("borderRadius") else -1.0),
+          "borderTopRadius" to (if (map.hasKey("borderTopRadius")) map.getDouble("borderTopRadius") else -1.0),
+          "borderBottomRadius" to (if (map.hasKey("borderBottomRadius")) map.getDouble("borderBottomRadius") else -1.0),
+          "widestCard" to (map.hasKey("widestCard") && map.getBoolean("widestCard")),
+          "scrimOpacity" to
+            (if (map.hasKey("scrimOpacity")) map.getDouble("scrimOpacity") else 1.0),
+        ),
       )
     }
     view.setDetents(list)
   }
 
-  @ReactProp(name = "safeAreaTopInset")
-  override fun setSafeAreaTopInset(view: BottomSheetView, safeAreaTopInset: Double) {
-    view.setSafeAreaTopInset(safeAreaTopInset)
-  }
-
-  @ReactProp(name = "fullscreenTopOffset")
-  override fun setFullscreenTopOffset(view: BottomSheetView, fullscreenTopOffset: Double) {
-    view.setFullscreenTopOffset(fullscreenTopOffset)
-  }
-
-  @ReactProp(name = "detentSpacing")
-  override fun setDetentSpacing(view: BottomSheetView, value: ReadableArray?) = Unit
-
-  @ReactProp(name = "detentCornerRadius")
-  override fun setDetentCornerRadius(view: BottomSheetView, value: ReadableArray?) {
-    val radii = value?.let { array -> List(array.size()) { array.getDouble(it).toFloat() } }
-    view.setDetentCornerRadius(radii)
-  }
-
-  @ReactProp(name = "index")
   override fun setIndex(view: BottomSheetView, index: Int) {
-    view.setIndex(index)
+    // Props within an update arrive in no particular order, so apply the index after the update's
+    // detents, as iOS does. Otherwise an index that targets a newly added detent is dropped.
+    view.pendingIndex = index
   }
 
-  @ReactProp(name = "animateIn")
+  override fun onAfterUpdateTransaction(view: BottomSheetView) {
+    super.onAfterUpdateTransaction(view)
+    view.applyPendingIndex()
+  }
+
   override fun setAnimateIn(view: BottomSheetView, animateIn: Boolean) {
     view.animateIn = animateIn
   }
 
-  @ReactProp(name = "animateContentHeight")
+  override fun setContentTopInsetOffset(view: BottomSheetView, contentTopInsetOffset: Double) {
+    view.contentTopInsetOffset = contentTopInsetOffset
+  }
+
+  override fun setContentTopInset(view: BottomSheetView, contentTopInset: Double) {
+    view.contentTopInset = contentTopInset
+  }
+
+  override fun setScaleContent(view: BottomSheetView, scaleContent: Boolean) {
+    view.scaleContent = scaleContent
+  }
+
   override fun setAnimateContentHeight(view: BottomSheetView, animateContentHeight: Boolean) {
     view.animateContentHeight = animateContentHeight
   }
 
-  @ReactProp(name = "animationDurationMs")
-  override fun setAnimationDurationMs(view: BottomSheetView, value: Double) {
-    view.animationDurationMs = value.toFloat()
-  }
-
-  @ReactProp(name = "debugSurfaceBorders")
-  override fun setDebugSurfaceBorders(view: BottomSheetView, value: Boolean) = Unit
-
-  @ReactProp(name = "modal")
   override fun setModal(view: BottomSheetView, modal: Boolean) {
     view.modal = modal
   }
 
-  @ReactProp(name = "nativeOverlay")
-  override fun setNativeOverlay(view: BottomSheetView, value: Boolean) {
-    view.setNativeOverlay(value)
+  override fun setWindowOverlay(view: BottomSheetView, value: Boolean) {
+    view.setWindowOverlay(value)
   }
 
-  @ReactProp(name = "extendUnderStatusBar")
-  override fun setExtendUnderStatusBar(view: BottomSheetView, value: Boolean) {
-    view.extendUnderStatusBar = value
+  override fun setOpenOrder(view: BottomSheetView, value: Int) {
+    view.setOpenOrder(value)
   }
 
-  @ReactProp(name = "disableScrollableNegotiation")
-  override fun setDisableScrollableNegotiation(view: BottomSheetView, value: Boolean) {
-    view.disableScrollableNegotiation = value
+  override fun setHasCloseRequestHandler(view: BottomSheetView, value: Boolean) {
+    view.setHasCloseRequestHandler(value)
   }
 
-  @ReactProp(name = "scrimColor", customType = "Color")
+  override fun setScrollExpandCoordination(view: BottomSheetView, value: Int) {
+    view.scrollExpandCoordination = value
+  }
+
+  override fun setScrollCollapseCoordination(view: BottomSheetView, value: Int) {
+    view.scrollCollapseCoordination = value
+  }
+
+  override fun setSettleDuration(view: BottomSheetView, value: Double) {
+    view.settleDuration = value.toFloat()
+  }
+
   override fun setScrimColor(view: BottomSheetView, scrimColor: Int?) {
     view.setScrimColor(scrimColor)
   }
 
-  @ReactProp(name = "scrimOpacities")
-  override fun setScrimOpacities(view: BottomSheetView, value: ReadableArray?) {
-    val opacities = mutableListOf<Float>()
+  override fun setScrimAccessibilityLabel(view: BottomSheetView, value: String?) {
+    view.setScrimAccessibilityLabel(value)
+  }
+
+  override fun setSurfaceCornerRadii(view: BottomSheetView, value: ReadableArray?) {
+    val radii = mutableListOf<Float>()
     if (value != null) {
       for (i in 0 until value.size()) {
-        opacities.add(value.getDouble(i).toFloat())
+        radii.add(value.getDouble(i).toFloat())
       }
     }
-    view.setScrimOpacities(opacities)
+    view.setSurfaceCornerRadii(radii)
   }
+
+  override fun setSurfaceShadows(view: BottomSheetView, value: ReadableArray?) {
+    val shadows = mutableListOf<CardShadow>()
+    if (value != null) {
+      for (i in 0 until value.size()) {
+        val shadow = value.getMap(i) ?: continue
+        shadows.add(
+          CardShadow(
+            offsetX = shadow.getDouble("offsetX").toFloat(),
+            offsetY = shadow.getDouble("offsetY").toFloat(),
+            blurRadius = shadow.getDouble("blurRadius").toFloat(),
+            spreadDistance = shadow.getDouble("spreadDistance").toFloat(),
+            color = shadowColor(view, shadow),
+          ),
+        )
+      }
+    }
+    view.setSurfaceShadows(shadows)
+  }
+
+  override fun setSurfaceElevation(view: BottomSheetView, value: Double) {
+    view.setSurfaceElevation(value.toFloat())
+  }
+
+  override fun setSurfaceShadowColor(view: BottomSheetView, value: Int?) {
+    view.setSurfaceShadowColor(value ?: Color.BLACK)
+  }
+
+  // Processed colors arrive as numbers, or as maps for `PlatformColor`.
+  private fun shadowColor(view: BottomSheetView, shadow: ReadableMap): Int {
+    val value: Any? =
+      when (shadow.getType("color")) {
+        ReadableType.Number -> shadow.getDouble("color")
+        ReadableType.Map -> shadow.getMap("color")
+        else -> null
+      }
+    return ColorPropConverter.getColor(value, view.context, Color.BLACK)
+  }
+
+  // Android always draws circular corners; the curve applies on iOS only.
+  override fun setSurfaceCornerCurve(view: BottomSheetView, value: String?) = Unit
 
   override fun onDropViewInstance(view: BottomSheetView) {
     super.onDropViewInstance(view)

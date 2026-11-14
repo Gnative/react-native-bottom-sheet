@@ -20,10 +20,15 @@ config.resolver.nodeModulesPaths = [
 config.resolver.extraNodeModules = {
   ...config.resolver.extraNodeModules,
   [pkg.name]: root,
+  '@swmansion/react-native-bottom-sheet': root,
 };
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (moduleName === pkg.name || moduleName.startsWith(`${pkg.name}/`)) {
+  if (
+    moduleName === pkg.name ||
+    moduleName === '@swmansion/react-native-bottom-sheet' ||
+    moduleName.startsWith(`${pkg.name}/`)
+  ) {
     context = {
       ...context,
       mainFields: ['source', ...context.mainFields],
