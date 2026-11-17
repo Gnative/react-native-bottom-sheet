@@ -1,6 +1,14 @@
-import { useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from 'react';
 import type {
   ColorValue,
+  LayoutChangeEvent,
   NativeSyntheticEvent,
   StyleProp,
   ViewStyle,
@@ -16,6 +24,12 @@ import type { NativeProps } from './BottomSheetNativeComponent';
 import { Portal } from './BottomSheetProvider';
 import { isLayoutRTL } from './layoutDirection';
 import {
+  crowdedInsetsWarning,
+  resolveMaxWidth,
+  resolvePlacement,
+  type SheetPlacement,
+} from './cardPlacement';
+import {
   CONTENT_HEIGHT_MARKER_NATIVE_ID,
   type Detent,
   isNormalizedDetentClosed,
@@ -27,6 +41,7 @@ import {
   validateIndex,
   validateSettleDuration,
 } from './bottomSheetUtils';
+export type { SheetPlacement } from './cardPlacement';
 export type {
   Detent,
   DetentConfig,
@@ -160,6 +175,30 @@ export interface BottomSheetProps {
   /** Signed adjustment to the content boundary. Use -handleHeight to align
    * the area below a handle with the safe area. Default 0. */
   contentTopInsetOffset?: number;
+  /**
+   * The widest the sheet gets, in points, so a sheet on a tablet, a foldable,
+   * a desktop browser or a landscape phone doesn't stretch across the whole
+   * screen. It caps the column the sheet sits in, side `insets` included: the
+   * card fills the column between its detent's insets, as it would fill a
+   * screen this wide, and `placement` decides where the column sits when it is
+   * narrower than the host. Applies at every detent, and doesn't relayout the
+   * content: the content is laid out at the widest card's width.
+   *
+   * A number greater than 0. Leave it unset, or pass `Infinity`, for no cap.
+   */
+  maxWidth?: number;
+  /**
+   * Where the sheet sits across the host when `maxWidth` makes it narrower
+   * than the host, like `UISheetPresentationController`'s `preferredPlacement`
+   * on iOS 27. `'center'` puts the sheet's middle on the host's; `'start'` and
+   * `'end'` put it against the start or end edge, following the layout
+   * direction like the detents' `start` and `end` insets, so `'start'` is on
+   * the right in a right-to-left layout. The detent's side insets then apply within the
+   * sheet's width, as on a narrow screen.
+   *
+   * @default 'center'
+   */
+  placement?: SheetPlacement;
   /**
    * Finite, zero-based integer in `0..(detents.length - 1)`. When shortening
    * `detents`, update `index` to remain in range in the same render.
@@ -298,6 +337,8 @@ export const BottomSheet = (props: BottomSheetProps) => {
     fullscreenTopOffset = 0,
     contentTopInset = 0,
     contentTopInsetOffset = 0,
+    maxWidth,
+    placement,
     index,
     animateIn = true,
     animateContentHeight = true,
@@ -337,9 +378,14 @@ export const BottomSheet = (props: BottomSheetProps) => {
   validateIndex(index, detents.length);
   validateSettleDuration(settleDuration);
   const isRTL = isLayoutRTL();
+  const resolvedMaxWidth = resolveMaxWidth(maxWidth);
   const normalizedDetents = normalizeDetents(
     detents,
     topInset,
+    {
+      maxWidth: resolvedMaxWidth,
+      placementBias: resolvePlacement(placement, isRTL),
+    },
     modal,
     isRTL,
     fullscreenTopOffset
@@ -365,6 +411,14 @@ export const BottomSheet = (props: BottomSheetProps) => {
   const widestDetent = normalizedDetents.find((detent) => detent.widestCard);
   const contentLeft = scaleContent ? (widestDetent?.insetLeft ?? 0) : 0;
   const contentRight = scaleContent ? (widestDetent?.insetRight ?? 0) : 0;
+  // Caps the content at the widest card's width: the sheet's column less that
+  // card's side insets, which Yoga applies as margins. The hosts place the card
+  // themselves and move the content onto it, so where Yoga puts the capped box
+  // (the start edge) only has to be the same for the surface and the content.
+  const contentMaxWidth =
+    resolvedMaxWidth > 0
+      ? Math.max(0, resolvedMaxWidth - contentLeft - contentRight)
+      : undefined;
   // When the sheet last opened, relative to other sheets: 0 until it first
   // opens. This includes reopening while it is still closing.
   const [wasSheetClosed, setWasSheetClosed] = useState(isSheetClosed);
@@ -409,6 +463,33 @@ export const BottomSheet = (props: BottomSheetProps) => {
         NativeProps & { children?: ReactNode }
       >
   );
+
+  // Side insets that fill the host squeeze the card to nothing; the hosts clamp
+  // it rather than fail, since a host can get that narrow at runtime. Warn in
+  // development, against the host's laid-out width, after every render (the
+  // detents may change without a layout) and on every layout.
+  const hostWidthRef = useRef(0);
+  const lastWarningRef = useRef<string | null>(null);
+  const warnAboutCrowdedInsets = () => {
+    const warning = crowdedInsetsWarning(
+      normalizedDetents,
+      hostWidthRef.current,
+      resolvedMaxWidth
+    );
+    if (warning !== null && warning !== lastWarningRef.current) {
+      console.warn(warning);
+    }
+    lastWarningRef.current = warning;
+  };
+  useEffect(() => {
+    if (__DEV__) warnAboutCrowdedInsets();
+  });
+  const handleLayout = __DEV__
+    ? (event: LayoutChangeEvent) => {
+        hostWidthRef.current = event.nativeEvent.layout.width;
+        warnAboutCrowdedInsets();
+      }
+    : undefined;
 
   if (lazy && !isSheetActive) {
     return null;
@@ -487,6 +568,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
           onDragEnd={() => onDragEnd?.()}
           onPositionChange={onPositionChange}
           onCloseRequest={onCloseRequest}
+          onLayout={handleLayout}
         >
           {surface != null && (
             <BottomSheetSurfaceView
@@ -497,6 +579,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
                 {
                   start: isRTL ? contentRight : contentLeft,
                   end: isRTL ? contentLeft : contentRight,
+                  maxWidth: contentMaxWidth,
                 },
               ]}
             >
@@ -519,6 +602,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
               {
                 marginStart: isRTL ? contentRight : contentLeft,
                 marginEnd: isRTL ? contentLeft : contentRight,
+                maxWidth: contentMaxWidth,
               },
             ]}
           >

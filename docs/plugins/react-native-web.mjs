@@ -9,8 +9,13 @@ const docsRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 /** @type {import('@docusaurus/types').PluginModule} */
 const reactNativeWeb = () => ({
   name: 'react-native-web',
-  configureWebpack: () => ({
+  configureWebpack: ({ mode }, _isServer, { currentBundler }) => ({
     mergeStrategy: { 'resolve.extensions': 'prepend' },
+    plugins: [
+      new currentBundler.instance.DefinePlugin({
+        __DEV__: mode === 'development',
+      }),
+    ],
     resolve: {
       alias: {
         '@swmansion/react-native-bottom-sheet$': path.resolve(

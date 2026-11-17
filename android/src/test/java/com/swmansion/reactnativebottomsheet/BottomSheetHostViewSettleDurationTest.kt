@@ -36,13 +36,30 @@ class BottomSheetHostViewSettleDurationTest {
       sheet.settleDuration = 4f
 
       sheet.drag(-180f to 360L)
-      // Robolectric doesn't advance SystemClock with the frames, so the 4s deadline never fires
-      // here; idle long enough for the spring to come to rest on its own.
       idleFor(10_000L)
 
       assertEquals(listOf(2), listener.settles)
       assertTrue(listener.peakPosition > 590.0)
       assertTrue(listener.peakPosition <= 600.0)
+    }
+  }
+
+  @Test
+  fun `a settle lands on its detent at the duration without a jump`() {
+    withSheet(listOf(0.0, 300.0, 1800.0)) { sheet, listener ->
+      sheet.settleDuration = 0.3f
+
+      sheet.setIndex(2)
+      // The duration and two frames of slack.
+      idleFor(330L)
+
+      assertEquals(listOf(2), listener.settles)
+      assertEquals(1800.0, listener.positions.last(), 0.0)
+      // The spring alone is still 0.3% (4.5px) short at the duration. Covering that in the last
+      // frame would make it the largest step of the tail instead of the smallest.
+      val tail = listener.positions.zipWithNext { from, to -> to - from }.takeLast(4)
+      assertTrue(tail.all { it > 0.0 })
+      assertEquals(tail.sortedDescending(), tail)
     }
   }
 
@@ -129,11 +146,13 @@ class BottomSheetHostViewSettleDurationTest {
 private class SettleRecordingListener : BottomSheetViewListener {
   val indexChanges = mutableListOf<Int>()
   val settles = mutableListOf<Int>()
+  val positions = mutableListOf<Double>()
   var peakPosition = 0.0
 
   fun clear() {
     indexChanges.clear()
     settles.clear()
+    positions.clear()
     peakPosition = 0.0
   }
 
@@ -146,6 +165,7 @@ private class SettleRecordingListener : BottomSheetViewListener {
   }
 
   override fun onPositionChange(position: Double, index: Double) {
+    positions.add(position)
     peakPosition = maxOf(peakPosition, position)
   }
 

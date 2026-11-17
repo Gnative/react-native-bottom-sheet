@@ -92,8 +92,9 @@ internal class Card(
     clipContainer.setCornerRadii(radii)
     for (shadowView in shadowViews) shadowView.setCornerRadii(radii)
     val insets = cardInsetsAt(position)
-    val left = insets.left
-    val right = (state.sheetContainer.width - insets.right).coerceAtLeast(left)
+    val span = state.placeCard(insets, state.sheetContainer.width.toFloat())
+    val left = span.left
+    val right = left + span.width
     val bottom = cardBottomAt(position, insets)
     clipContainer.setCard(left, 0f, right, bottom)
     updateContentTransform(left, right)
@@ -154,8 +155,7 @@ internal class Card(
       shadowContentOffsetX = 0f
       return
     }
-    val widest =
-      state.sheetContainer.width - state.widestCardInsets.left - state.widestCardInsets.right
+    val widest = state.placeCard(state.widestCardInsets, state.sheetContainer.width.toFloat()).width
     val scale = if (widest > 0f) (cardRight - cardLeft) / widest else 1f
     for (i in 0 until clipContainer.childCount) {
       val child = clipContainer.getChildAt(i)
@@ -169,7 +169,12 @@ internal class Card(
           else state.contentInsetAt(state.height - state.sheetContainer.translationY)
     }
     shadowContentScale = scale
-    shadowContentOffsetX = cardLeft - scale * state.widestCardInsets.left
+    // The shadow tree scales and shifts the children from where they are laid out, so `measure`
+    // follows what is drawn even before a new layout catches up with a resize.
+    val contentLeft =
+      if (clipContainer.childCount > 0) clipContainer.getChildAt(0).left.toFloat()
+      else state.contentLeft(widest)
+    shadowContentOffsetX = cardLeft - scale * contentLeft
   }
 
   // Fabric recycles the view, which must not keep the card's scale.
@@ -241,10 +246,10 @@ internal class Card(
     // children keep sheet-container coordinates; only its clip follows the card.
     for (shadowView in shadowViews) shadowView.layout(0, 0, containerWidth, containerHeight)
     clipContainer.layout(0, 0, containerWidth, containerHeight)
-    // Fabric only measures the children, so the host applies the content's Yoga margin.
-    val contentLeft = if (state.scaleContent) state.widestCardInsets.left.toInt() else 0
+    // Fabric only measures the children, so the host applies the content's Yoga position.
     for (i in 0 until clipContainer.childCount) {
       val child = clipContainer.getChildAt(i)
+      val contentLeft = if (state.scaleContent) state.contentLeft(child.measuredWidth.toFloat()).toInt() else 0
       child.layout(contentLeft, 0, contentLeft + child.measuredWidth, child.measuredHeight)
     }
   }

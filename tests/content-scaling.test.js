@@ -9,7 +9,7 @@ mock.module('react-native', () => ({
 const { SheetCard } = await import('../src/web/card');
 const { normalizeDetents } = await import('../src/bottomSheetUtils');
 
-function fixture(scaleContent) {
+function fixture(scaleContent, maxWidth = 0) {
   const elements = Object.fromEntries(
     ['host', 'card', 'content', 'surface', 'shadow'].map((name) => [
       name,
@@ -28,6 +28,7 @@ function fixture(scaleContent) {
       { value: 600, insets: { left: 8, right: 8 }, borderRadius: 0 },
     ],
     0,
+    { maxWidth, placementBias: 0.5 },
     false,
     false
   );
@@ -42,7 +43,7 @@ function fixture(scaleContent) {
       ...rawDetents[index],
     })),
     widestCardLeft: 8,
-    widestCardGaps: 16,
+    widestCardInsets: { insetLeft: 8, insetRight: 8 },
   };
   return { host, card: new SheetCard(host) };
 }
@@ -65,6 +66,15 @@ describe('optional inset content scaling', () => {
     expect(card.currentLayoutHeight()).toBe(300);
     expect(host.elements.card.style.clipPath).toContain('40px');
     expect(host.elements.shadow.style.borderRadius).toBe('24px 24px 8px 8px');
+  });
+  test('false keeps content unscaled inside a centered max-width card clip', () => {
+    const { host, card } = fixture(false, 200);
+    card.updateCardShape();
+    expect(host.elements.content.style.transform).toBe('');
+    expect(host.elements.surface.style.transform).toBe('');
+    expect(host.elements.shadow.style.left).toBe('140px');
+    expect(host.elements.shadow.style.right).toBe('140px');
+    expect(host.elements.card.style.clipPath).toContain('140px');
   });
   test('the mode can change at the current detent and clear old transforms', () => {
     const { host, card } = fixture(true);

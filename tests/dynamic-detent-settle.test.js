@@ -33,6 +33,7 @@ function sheet({ animate = true, activeSpring = false } = {}) {
   controller.rawDetents = normalizeDetents(
     [0, 'content', 600],
     0,
+    { maxWidth: 0, placementBias: 0.5 },
     false,
     false
   );
@@ -106,6 +107,7 @@ describe('dynamic detent completion', () => {
     controller.rawDetents = normalizeDetents(
       [0, 'content', 650],
       0,
+      { maxWidth: 0, placementBias: 0.5 },
       false,
       false
     );

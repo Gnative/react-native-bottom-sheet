@@ -136,6 +136,9 @@ class BottomSheetViewManager :
           "borderTopRadius" to (if (map.hasKey("borderTopRadius")) map.getDouble("borderTopRadius") else -1.0),
           "borderBottomRadius" to (if (map.hasKey("borderBottomRadius")) map.getDouble("borderBottomRadius") else -1.0),
           "widestCard" to (map.hasKey("widestCard") && map.getBoolean("widestCard")),
+          "maxWidth" to inset("maxWidth"),
+          "placementBias" to
+            (if (map.hasKey("placementBias")) map.getDouble("placementBias") else 0.5),
           "scrimOpacity" to
             (if (map.hasKey("scrimOpacity")) map.getDouble("scrimOpacity") else 1.0),
         ),

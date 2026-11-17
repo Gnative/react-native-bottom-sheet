@@ -1,15 +1,14 @@
 package com.swmansion.reactnativebottomsheet.host
 
-import android.os.SystemClock
-import androidx.dynamicanimation.animation.DynamicAnimation
+import androidx.dynamicanimation.animation.FloatValueHolder
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
 import com.swmansion.reactnativebottomsheet.closerequest.CloseRequestPresentationTracker
 import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
-import kotlin.math.roundToLong
 
 // Seconds of release velocity projected onto the sheet's position before the nearest-detent search
 // that resolves a drag release, so a gentle but deliberate swipe counts toward the detent it was
@@ -203,10 +202,39 @@ internal class Snapping(
     val velocityRatio = if (distance != 0f) velocity / distance else 0f
     val initialVelocity = max(velocityRatio, -5f) * distance
     val omega = max(8f / settleDuration, velocityRatio)
-    val settleDeadline = SystemClock.uptimeMillis() + (8000f / omega).roundToLong()
+    // The spring only approaches its target: at omega*t = 8, where the settle ends, it is still a
+    // fraction of the way short (0.3% from rest). Ending there would leave that fraction to a
+    // one-frame jump, so the leftover is scaled out of the whole curve, as on iOS: the sheet
+    // starts where it is, keeps the spring's shape and lands on the target at omega*t = 8.
+    val startOffset = currentTy - targetTy
+    val endOffset = exp(-8f) * (startOffset + (initialVelocity + omega * startOffset) * 8f / omega)
+
+    var settled = false
+    fun finishSettle() {
+      if (settled) return
+      settled = true
+      state.activeAnimation = null
+      state.activeAnimationEmitsSettle = false
+      state.pinnedContentInset = null
+      state.contentInsetTransition = null
+      state.contentInsetAnchor = null
+      state.suppressScrimForClosingTarget = false
+      state.scrimPinnedFull = false
+      if (state.closedIndex == index) {
+        state.sheetContainer.translationY = translationY(index)
+        scrim.hideScrim()
+      }
+      emitPosition()
+      contentRegion.recomputeNativeGeometry()
+      closeRequestPresentationTracker.onTransitionSettled()
+      host.notifyCloseRequestStateChanged()
+      host.updateInteractionState()
+      if (emitSettle) host.listener?.onSettle(index)
+    }
 
     val spring =
-      SpringAnimation(state.sheetContainer, DynamicAnimation.TRANSLATION_Y, targetTy).apply {
+      // The spring runs on a value of its own; the sheet follows it through the scaling above.
+      SpringAnimation(FloatValueHolder(currentTy)).apply {
         spring =
           SpringForce(targetTy).apply {
             dampingRatio = SpringForce.DAMPING_RATIO_NO_BOUNCY
@@ -214,17 +242,28 @@ internal class Snapping(
             stiffness = omega.pow(2)
           }
         // Like iOS, the duration fixes when the settle ends rather than how close to the target
-        // the spring has to get: keep the spring from ending itself before the deadline.
+        // the spring has to get: keep the spring from ending itself before then.
         setMinimumVisibleChange(SETTLE_MIN_VISIBLE_CHANGE)
         setStartVelocity(initialVelocity)
-        // Forward the position on every frame of the settle. The listener fires
-        // immediately after the spring writes `translationY`, so `emitPosition`
-        // reads the value being shown this frame — keeping followers that track
-        // `onPositionChange` (e.g. a Reanimated view) in lockstep with the sheet.
-        addUpdateListener { animation, _, _ ->
-          emitPosition()
-          if (SystemClock.uptimeMillis() >= settleDeadline) {
-            (animation as SpringAnimation).skipToEnd()
+        addUpdateListener { animation, value, _ ->
+          // The share of the way still to go: 1 at the start, 0 at omega*t = 8.
+          val remaining =
+            if (startOffset != endOffset) {
+              (value - targetTy - endOffset) / (startOffset - endOffset)
+            } else {
+              0f
+            }
+          if (remaining > 0f) {
+            state.sheetContainer.translationY = targetTy + startOffset * remaining
+            // Forward the position on every frame of the settle, right after writing
+            // `translationY`, so `emitPosition` reads the value being shown this frame — keeping
+            // followers that track `onPositionChange` (e.g. a Reanimated view) in lockstep with
+            // the sheet.
+            emitPosition()
+          } else {
+            state.sheetContainer.translationY = targetTy
+            animation.cancel()
+            finishSettle()
           }
         }
         addEndListener { _, canceled, _, _ ->
@@ -237,23 +276,8 @@ internal class Snapping(
             }
             return@addEndListener
           }
-          state.activeAnimation = null
-          state.activeAnimationEmitsSettle = false
-          state.pinnedContentInset = null
-          state.contentInsetTransition = null
-          state.contentInsetAnchor = null
-          state.suppressScrimForClosingTarget = false
-          state.scrimPinnedFull = false
-          if (state.closedIndex == index) {
-            state.sheetContainer.translationY = translationY(index)
-            scrim.hideScrim()
-          }
-          emitPosition()
-          contentRegion.recomputeNativeGeometry()
-          closeRequestPresentationTracker.onTransitionSettled()
-          host.notifyCloseRequestStateChanged()
-          host.updateInteractionState()
-          if (emitSettle) host.listener?.onSettle(index)
+          // A spring with next to no way to go ends itself before omega*t = 8.
+          finishSettle()
         }
       }
 

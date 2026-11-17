@@ -7,6 +7,7 @@ export type CaseKey =
   | 'fullscreen-detents'
   | 'corner-touches'
   | 'detached-sheet'
+  | 'wide-screen'
   | 'lazy-mounted-modal'
   | 'window-overlay-modal'
   | 'window-overlay-nested'
@@ -76,6 +77,11 @@ export const DEMO_CASES: DemoCase[] = [
     key: 'fullscreen-detents',
     title: 'Fullscreen surface and safe content',
     href: '/fullscreen-detents',
+  },
+  {
+    key: 'wide-screen',
+    title: 'Wide screens (maxWidth, placement)',
+    href: '/wide-screen',
   },
   {
     key: 'corner-touches',

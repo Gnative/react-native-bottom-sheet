@@ -29,6 +29,7 @@ function fixture({
   const rawDetents = normalizeDetents(
     [0, 320, { value: 'fullscreen', insets: { bottom }, borderRadius: 0 }],
     undefined,
+    { maxWidth: 0, placementBias: 0.5 },
     false,
     false,
     offset
@@ -44,7 +45,7 @@ function fixture({
     hostHeight: 800,
     statusBarOverlap: safeArea,
     widestCardLeft: 0,
-    widestCardGaps: 0,
+    widestCardInsets: { insetLeft: 0, insetRight: 0 },
     rawDetents,
     lastReportedError: null,
     emit() {},
@@ -60,6 +61,7 @@ describe('fullscreen detents and safe content', () => {
     host.rawDetents = normalizeDetents(
       [0, '100%', 'fullscreen'],
       undefined,
+      { maxWidth: 0, placementBias: 0.5 },
       false,
       false
     );
@@ -126,6 +128,7 @@ describe('fullscreen detents and safe content', () => {
     host.rawDetents = normalizeDetents(
       [0, 320, '100%', 'fullscreen'],
       undefined,
+      { maxWidth: 0, placementBias: 0.5 },
       false,
       false
     );
@@ -201,7 +204,13 @@ describe('fullscreen detents and safe content', () => {
 
   test('a single fullscreen detent keeps its offset through synthetic presentation', () => {
     const { host } = fixture();
-    host.rawDetents = normalizeDetents(['fullscreen'], undefined, false, false);
+    host.rawDetents = normalizeDetents(
+      ['fullscreen'],
+      undefined,
+      { maxWidth: 0, placementBias: 0.5 },
+      false,
+      false
+    );
     host.detents = resolveDetentSpecs(host);
     for (const position of [0, 320, 741, 800]) {
       expect(contentTopInsetAt(host, position)).toBe(59);
@@ -226,6 +235,7 @@ describe('fullscreen detents and safe content', () => {
     host.rawDetents = normalizeDetents(
       [0, 320, { value: 'fullscreen', insets: { left: 20, right: 20 } }],
       undefined,
+      { maxWidth: 0, placementBias: 0.5 },
       false,
       false
     );
@@ -248,7 +258,14 @@ describe('fullscreen detents and safe content', () => {
       expect(() => resolveContentTopInset(value)).toThrow();
     for (const value of [-1, NaN, Infinity])
       expect(() =>
-        normalizeDetents(['fullscreen'], undefined, false, false, value)
+        normalizeDetents(
+          ['fullscreen'],
+          undefined,
+          { maxWidth: 0, placementBias: 0.5 },
+          false,
+          false,
+          value
+        )
       ).toThrow();
   });
 });
