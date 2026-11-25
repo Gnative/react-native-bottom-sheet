@@ -524,6 +524,25 @@ class BottomSheetViewCloseRequestTest {
   }
 
   @Test
+  fun `window overlay closes on host detach and returns on reattach`() {
+    withActivity<ComponentActivity> { activity ->
+      val fixture = openWindowOverlaySheet(activity, CountingBottomSheetListener())
+      val content = activity.findViewById<ViewGroup>(android.R.id.content)
+
+      assertTrue(fixture.dialog.isShowing)
+      content.removeView(fixture.sheet)
+      assertTrue(!fixture.dialog.isShowing)
+
+      content.addView(fixture.sheet)
+      shadowOf(Looper.getMainLooper()).idle()
+      val restoredDialog = requireNotNull(ShadowDialog.getLatestDialog()) as ComponentDialog
+      assertTrue(restoredDialog !== fixture.dialog)
+      assertTrue(restoredDialog.isShowing)
+      fixture.destroy()
+    }
+  }
+
+  @Test
   fun `window overlay predictive Back stays ineligible after handler restoration`() {
     withActivity<ComponentActivity> { activity ->
       val listener = CountingBottomSheetListener()

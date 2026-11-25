@@ -240,6 +240,9 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
 
   override fun onDetachedFromWindow() {
     isViewAttached = false
+    // A screen can detach while its overlay dialog remains above the next screen.
+    // Restore it from onAttachedToWindow if this sheet becomes visible again.
+    if (overlayDialog != null) dismissOverlay()
     portalCloseRequestController.clear()
     overlayCloseRequestController.unbind()
     refreshCloseRequestControllers()
