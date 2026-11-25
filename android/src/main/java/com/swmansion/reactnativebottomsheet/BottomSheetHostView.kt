@@ -700,9 +700,9 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
     // a transparent scrim is still presented and must keep receiving touches.
     get() =
       modal &&
-        ((state.activeAnimation != null && !state.isTargetingClosedDetent) ||
+        (state.activeAnimation != null ||
           state.isPanning ||
-          state.currentSheetHeight() > 0.5f)
+          (!state.isTargetingClosedDetent && state.currentSheetHeight() > 0.5f))
 
   private fun updateInteractionState() {
     val interactive = isInteractive
